@@ -87,4 +87,17 @@ describe('ColorPalette', () => {
 
     expect(mockCanvasManager.setActiveColor).not.toHaveBeenCalled()
   })
+
+  it('debería reflejar estado colapsado inicial en el botón toggle si el panel inicia con is-collapsed', () => {
+    const propsPanel = container.querySelector('#properties-panel')
+    propsPanel.classList.add('is-collapsed')
+
+    const palette = new ColorPalette(container, { canvasManager: mockCanvasManager })
+    palette.mount()
+
+    const toggleBtn = container.querySelector('#toggle-properties-btn')
+    expect(toggleBtn.getAttribute('aria-expanded')).toBe('false')
+    expect(toggleBtn.getAttribute('title')).toBe('Expandir Panel')
+    expect(toggleBtn.innerHTML).toContain('chevron-left')
+  })
 })

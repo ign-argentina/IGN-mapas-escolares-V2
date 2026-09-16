@@ -45,7 +45,7 @@ describe('ExportModal - Advertencia de Impresión', () => {
 
             <div class="nbi-export-modal__warning hidden" id="exp-print-warning" role="alert">
               <div class="nbi-export-modal__warning-header">
-                <i data-lucide="alert-triangle" class="nbi-export-modal__warning-icon"></i>
+                <i data-lucide="triangle-alert" class="nbi-export-modal__warning-icon"></i>
                 <span>Recomendación de Impresión</span>
               </div>
               <p class="nbi-export-modal__warning-text">

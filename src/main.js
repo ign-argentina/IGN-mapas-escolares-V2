@@ -60,7 +60,9 @@ import {
   Play,
   ExternalLink,
   Globe,
-  BookOpen
+  BookOpen,
+  EllipsisVertical,
+  TriangleAlert
 } from 'lucide'
 
 // Expose lucide globally to maintain vanilla JS components compatibility
@@ -128,7 +130,9 @@ window.lucide = {
         Play,
         ExternalLink,
         Globe,
-        BookOpen
+        BookOpen,
+        EllipsisVertical,
+        TriangleAlert
       }
     })
 }

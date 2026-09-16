@@ -34,12 +34,19 @@ export class Toolbar extends Component {
     this.zoomInBtn = document.getElementById('action-zoom-in')
     this.zoomOutBtn = document.getElementById('action-zoom-out')
     this.zoomHomeBtn = document.getElementById('action-zoom-home')
+    this.moreBtn = document.getElementById('tool-more')
+    this.overflowMenu = document.getElementById('toolbar-overflow-menu')
+    this.overflowTools = ['rect', 'circle', 'arrow', 'polyline', 'polygon', 'pin']
 
     const modalEl = document.getElementById('clear-confirm-modal')
     if (modalEl) {
       this.clearConfirmModal = new ClearConfirmModal(modalEl, () => {
         this.canvasManager.clearCanvas()
       })
+    }
+
+    if (window.lucide) {
+      window.lucide.createIcons()
     }
 
     this.updateActiveToolUI(this.canvasManager.activeTool)
@@ -53,6 +60,7 @@ export class Toolbar extends Component {
           if (this.sidebar && this.sidebar.isOpen && typeof this.sidebar.close === 'function') {
             this.sidebar.close()
           }
+          this.closeOverflowMenu()
           if (typeof this.onCanvasToolActivated === 'function') {
             this.onCanvasToolActivated(toolName)
           }
@@ -61,6 +69,38 @@ export class Toolbar extends Component {
         })
       }
     })
+
+    // Manejar menú de 3 puntos (overflow)
+    if (this.moreBtn && this.overflowMenu) {
+      this.addEvent(this.moreBtn, 'click', (e) => {
+        e.stopPropagation()
+        this.toggleOverflowMenu()
+      })
+
+      this.addEvent(document, 'click', (e) => {
+        if (
+          this.isOverflowOpen() &&
+          !this.overflowMenu.contains(e.target) &&
+          !this.moreBtn.contains(e.target)
+        ) {
+          this.closeOverflowMenu()
+        }
+      })
+
+      this.addEvent(window, 'keydown', (e) => {
+        if (e.key === 'Escape' && this.isOverflowOpen()) {
+          this.closeOverflowMenu()
+          this.moreBtn.focus()
+        }
+      })
+    }
+
+    const stickersBtn = document.getElementById('tool-stickers')
+    if (stickersBtn) {
+      this.addEvent(stickersBtn, 'click', () => {
+        this.closeOverflowMenu()
+      })
+    }
 
     if (this.deleteBtn) {
       this.addEvent(this.deleteBtn, 'click', () => {
@@ -114,12 +154,58 @@ export class Toolbar extends Component {
     }
   }
 
+  isOverflowOpen() {
+    return !!this.overflowMenu?.classList.contains('is-open')
+  }
+
+  openOverflowMenu() {
+    if (this.overflowMenu) {
+      this.overflowMenu.classList.remove('hidden')
+      this.overflowMenu.classList.add('is-open')
+    }
+    if (this.moreBtn) {
+      this.moreBtn.setAttribute('aria-expanded', 'true')
+      this.moreBtn.classList.add('is-active')
+    }
+  }
+
+  closeOverflowMenu() {
+    if (this.overflowMenu) {
+      this.overflowMenu.classList.remove('is-open')
+    }
+    if (this.moreBtn) {
+      this.moreBtn.setAttribute('aria-expanded', 'false')
+      if (!this.overflowTools?.includes(this.canvasManager?.activeTool)) {
+        this.moreBtn.classList.remove('is-active')
+      }
+    }
+  }
+
+  toggleOverflowMenu() {
+    if (this.isOverflowOpen()) {
+      this.closeOverflowMenu()
+    } else {
+      this.openOverflowMenu()
+    }
+  }
+
   updateActiveToolUI(activeTool) {
     Object.values(this.toolButtons).forEach((btn) => {
       if (btn) btn.classList.remove('is-active')
     })
     if (this.toolButtons[activeTool]) {
       this.toolButtons[activeTool].classList.add('is-active')
+    }
+    if (this.moreBtn) {
+      const isOverflowActive = this.overflowTools?.includes(activeTool)
+      if (isOverflowActive) {
+        this.moreBtn.classList.add('is-tool-active')
+      } else {
+        this.moreBtn.classList.remove('is-tool-active')
+        if (!this.isOverflowOpen()) {
+          this.moreBtn.classList.remove('is-active')
+        }
+      }
     }
   }
 }

@@ -202,7 +202,23 @@ export async function bootstrap() {
 
 
 
-    // 3. Inicializar panel lateral dinámico y selector de mapas
+    // 3. Ocultar / colapsar paneles por defecto si se inicia desde celular o pantalla chica
+    const isSmallScreen =
+      typeof window !== 'undefined' &&
+      (window.innerWidth <= 768 ||
+        (typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 768px)').matches))
+
+    if (isSmallScreen) {
+      if (sidebarContainer) {
+        sidebarContainer.classList.add('is-collapsed')
+      }
+      const propertiesPanelEl = document.getElementById('properties-panel')
+      if (propertiesPanelEl) {
+        propertiesPanelEl.classList.add('is-collapsed')
+      }
+    }
+
+    // Inicializar panel lateral dinámico y selector de mapas
     const externalResourcesConfig = configRepository.getExternalResources()
     const linksTabConfig = externalResourcesConfig?.tab || {
       id: 'links',

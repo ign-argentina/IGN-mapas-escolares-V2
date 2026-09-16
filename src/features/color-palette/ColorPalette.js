@@ -99,6 +99,15 @@ export class ColorPalette extends Component {
       this.strokeValueDisplay.textContent = `${visualVal}px`
     }
 
+    if (this.propertiesPanel?.classList.contains('is-collapsed')) {
+      if (this.togglePropertiesBtn) {
+        this.togglePropertiesBtn.setAttribute('title', 'Expandir Panel')
+        this.togglePropertiesBtn.setAttribute('aria-label', 'Expandir panel de color')
+        this.togglePropertiesBtn.setAttribute('aria-expanded', 'false')
+        this.togglePropertiesBtn.innerHTML = '<i data-lucide="chevron-left"></i>'
+      }
+    }
+
     this.renderRecentColors()
   }
 

@@ -338,3 +338,31 @@
   min-height: 20px;
   flex-shrink: 0;
 }
+
+/* --- VISTA RESPONSIVA (CELULARES / PANTALLAS PEQUEÑAS) --- */
+@media (max-width: 768px) {
+  .nbi-properties {
+    top: 100px;
+    right: 10px;
+    max-width: calc(100vw - 20px);
+  }
+
+  .nbi-properties.is-collapsed {
+    width: 60px;
+    padding: var(--nbi-space-md) 4px;
+  }
+
+  .nbi-properties.is-collapsed #zoom-controls .nbi-btn,
+  .nbi-properties.is-collapsed .nbi-properties__actions .nbi-btn {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    min-height: 42px;
+    padding: 6px;
+  }
+
+  #recent-colors-container,
+  .nbi-recent-colors-container {
+    display: none !important;
+  }
+}

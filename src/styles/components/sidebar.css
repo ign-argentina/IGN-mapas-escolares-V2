@@ -358,3 +358,15 @@
 .nbi-sidebar__view.hidden {
   display: none !important;
 }
+
+/* --- VISTA RESPONSIVA (CELULARES / PANTALLAS PEQUEÑAS) --- */
+@media (max-width: 768px) {
+  .nbi-sidebar {
+    left: -5px;
+    max-width: calc(100vw - 48px);
+  }
+
+  .nbi-sidebar.is-collapsed {
+    transform: translateX(-100%);
+  }
+}

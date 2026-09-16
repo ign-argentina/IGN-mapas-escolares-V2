@@ -106,39 +106,46 @@
         <i data-lucide="pencil"></i>
       </button>
       <div class="nbi-toolbar__separator" role="separator" aria-orientation="vertical"></div>
-      <div class="nbi-toolbar__group" data-tour="tools-shapes">
-        <button class="nbi-btn" id="tool-rect" title="Agregar Rectángulo" aria-label="Dibujar rectángulo"
-          aria-pressed="false">
-          <i data-lucide="square"></i>
-        </button>
-        <button class="nbi-btn" id="tool-circle" title="Agregar Círculo" aria-label="Dibujar círculo"
-          aria-pressed="false">
-          <i data-lucide="circle"></i>
-        </button>
-        <button class="nbi-btn" id="tool-arrow" title="Agregar Flecha" aria-label="Dibujar flecha" aria-pressed="false">
-          <i data-lucide="move-right"></i>
-        </button>
-        <button class="nbi-btn" id="tool-polyline" title="Agregar Polilínea" aria-label="Dibujar polilínea"
-          aria-pressed="false">
-          <i data-lucide="route"></i>
-        </button>
-        <button class="nbi-btn" id="tool-polygon" title="Agregar Polígono libre" aria-label="Dibujar polígono libre"
-          aria-pressed="false">
-          <i data-lucide="pentagon"></i>
-        </button>
+      <!-- MENÚ DE HERRAMIENTAS SECUNDARIAS / OVERFLOW -->
+      <div class="nbi-toolbar__overflow-menu" id="toolbar-overflow-menu" role="menu" aria-label="Herramientas adicionales">
+        <div class="nbi-toolbar__group" data-tour="tools-shapes">
+          <button class="nbi-btn" id="tool-rect" title="Agregar Rectángulo" aria-label="Dibujar rectángulo"
+            aria-pressed="false">
+            <i data-lucide="square"></i>
+          </button>
+          <button class="nbi-btn" id="tool-circle" title="Agregar Círculo" aria-label="Dibujar círculo"
+            aria-pressed="false">
+            <i data-lucide="circle"></i>
+          </button>
+          <button class="nbi-btn" id="tool-arrow" title="Agregar Flecha" aria-label="Dibujar flecha" aria-pressed="false">
+            <i data-lucide="move-right"></i>
+          </button>
+          <button class="nbi-btn" id="tool-polyline" title="Agregar Polilínea" aria-label="Dibujar polilínea"
+            aria-pressed="false">
+            <i data-lucide="route"></i>
+          </button>
+          <button class="nbi-btn" id="tool-polygon" title="Agregar Polígono libre" aria-label="Dibujar polígono libre"
+            aria-pressed="false">
+            <i data-lucide="pentagon"></i>
+          </button>
+          <button class="nbi-btn" id="tool-pin" title="Agregar Marcador" aria-label="Agregar marcador o pin al mapa"
+            aria-pressed="false">
+            <i data-lucide="map-pin"></i>
+          </button>
+        </div>
       </div>
       <div class="nbi-toolbar__group" data-tour="tools-annotations">
         <button class="nbi-btn" id="tool-text" title="Agregar Texto" aria-label="Agregar texto" aria-pressed="false">
           <i data-lucide="type"></i>
         </button>
-        <button class="nbi-btn" id="tool-pin" title="Agregar Marcador" aria-label="Agregar marcador o pin al mapa"
-          aria-pressed="false">
-          <i data-lucide="map-pin"></i>
-        </button>
       </div>
       <button class="nbi-btn" id="tool-stickers" data-tour="tool-stickers" title="Decoraciones y Stickers"
         aria-label="Abrir panel de decoraciones y stickers" aria-expanded="false">
         <i data-lucide="smile"></i>
+      </button>
+      <button class="nbi-btn" id="tool-more" title="Más herramientas" aria-label="Más herramientas de dibujo"
+        aria-haspopup="true" aria-expanded="false">
+        <i data-lucide="ellipsis-vertical"></i>
       </button>
       <div class="nbi-toolbar__separator" role="separator" aria-orientation="vertical"></div>
       <button class="nbi-btn nbi-btn--danger" id="tool-delete" title="Borrar elemento seleccionado"
@@ -357,7 +364,7 @@
             <!-- ADVERTENCIA DE IMPRESIÓN (SOLO VISIBLE AL IMPRIMIR) -->
             <div class="nbi-export-modal__warning hidden" id="exp-print-warning" role="alert">
               <div class="nbi-export-modal__warning-header">
-                <i data-lucide="alert-triangle" class="nbi-export-modal__warning-icon" aria-hidden="true"></i>
+                <i data-lucide="triangle-alert" class="nbi-export-modal__warning-icon" aria-hidden="true"></i>
                 <span>Recomendación de Impresión</span>
               </div>
               <p class="nbi-export-modal__warning-text">
