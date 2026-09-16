@@ -10,9 +10,11 @@ const STICKER_CATEGORIES = [
       'bandera-argentina',
       'escarapela',
       'escudo-nacional',
+      'sol-patrio',
       'geolocalizacion',
       'barrio',
       'casa',
+      'casa-negativo',
       'paisaje-urbano-3',
       'espacio-publico',
       'pueblos-originarios',
@@ -44,6 +46,7 @@ const STICKER_CATEGORIES = [
       'desierto',
       'hojas',
       'nube',
+      'nube-negativo',
       'olas',
       'frio',
       'derrumbes',
@@ -53,7 +56,8 @@ const STICKER_CATEGORIES = [
       'mosquito',
       'gato',
       'perro',
-      'serpiente'
+      'serpiente',
+      'jaguarete'
     ],
     patterns: [/^clima-/]
   },
@@ -71,6 +75,8 @@ const STICKER_CATEGORIES = [
       'manzana',
       'pera',
       'tomate',
+      'bananas',
+      'lechuga',
       'uvas',
       'zanahorias',
       'zapallo',
@@ -91,7 +97,10 @@ const STICKER_CATEGORIES = [
       'pesos',
       'comida',
       'herramientas',
-      'camion-construccion'
+      'camion-construccion',
+      'camion',
+      'mate',
+      'vino'
     ]
   },
   {
@@ -99,6 +108,8 @@ const STICKER_CATEGORIES = [
     stickers: [
       'aeropuerto',
       'auto',
+      'auto-B1',
+      'avion',
       'micro',
       'tren',
       'ruta',
@@ -144,6 +155,7 @@ const STICKER_CATEGORIES = [
       'corazon',
       'corazon-lineal',
       'paleta-colores',
+      'lazo',
       'numero-0',
       'numero-1',
       'numero-2',
