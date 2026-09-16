@@ -150,4 +150,38 @@ describe('Toolbar with responsive overflow menu', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
     expect(overflowMenu.classList.contains('is-open')).toBe(false)
   })
+
+  it('debería activar el modo de selección (tool-select) si no está activo al hacer clic en tool-delete', () => {
+    const deleteBtn = document.getElementById('tool-delete')
+    const selectBtn = document.getElementById('tool-select')
+
+    // Inicialmente la herramienta activa es 'pan'
+    expect(mockCanvasManager.activeTool).toBe('pan')
+    expect(selectBtn.classList.contains('is-active')).toBe(false)
+
+    deleteBtn.click()
+
+    expect(mockCanvasManager.deleteSelected).toHaveBeenCalled()
+    expect(mockCanvasManager.setTool).toHaveBeenCalledWith('select')
+    expect(mockCanvasManager.activeTool).toBe('select')
+    expect(selectBtn.classList.contains('is-active')).toBe(true)
+  })
+
+  it('no debería volver a activar select si ya está activo al hacer clic en tool-delete', () => {
+    const deleteBtn = document.getElementById('tool-delete')
+    const selectBtn = document.getElementById('tool-select')
+
+    // Activamos 'select' primero
+    selectBtn.click()
+    expect(mockCanvasManager.activeTool).toBe('select')
+    expect(mockCanvasManager.setTool).toHaveBeenCalledWith('select')
+
+    mockCanvasManager.setTool.mockClear()
+    mockCanvasManager.deleteSelected.mockClear()
+
+    deleteBtn.click()
+
+    expect(mockCanvasManager.deleteSelected).toHaveBeenCalled()
+    expect(mockCanvasManager.setTool).not.toHaveBeenCalled()
+  })
 })

@@ -52,20 +52,24 @@ export class Toolbar extends Component {
     this.updateActiveToolUI(this.canvasManager.activeTool)
   }
 
+  activateTool(toolName) {
+    if (this.sidebar && this.sidebar.isOpen && typeof this.sidebar.close === 'function') {
+      this.sidebar.close()
+    }
+    this.closeOverflowMenu()
+    if (typeof this.onCanvasToolActivated === 'function') {
+      this.onCanvasToolActivated(toolName)
+    }
+    this.canvasManager.setTool(toolName)
+    this.updateActiveToolUI(toolName)
+  }
+
   bindEvents() {
     // Registrar manejadores para selección de cada herramienta
     Object.entries(this.toolButtons).forEach(([toolName, btn]) => {
       if (btn) {
         this.addEvent(btn, 'click', () => {
-          if (this.sidebar && this.sidebar.isOpen && typeof this.sidebar.close === 'function') {
-            this.sidebar.close()
-          }
-          this.closeOverflowMenu()
-          if (typeof this.onCanvasToolActivated === 'function') {
-            this.onCanvasToolActivated(toolName)
-          }
-          this.canvasManager.setTool(toolName)
-          this.updateActiveToolUI(toolName)
+          this.activateTool(toolName)
         })
       }
     })
@@ -105,6 +109,9 @@ export class Toolbar extends Component {
     if (this.deleteBtn) {
       this.addEvent(this.deleteBtn, 'click', () => {
         this.canvasManager.deleteSelected()
+        if (this.canvasManager?.activeTool !== 'select') {
+          this.activateTool('select')
+        }
       })
     }
 
