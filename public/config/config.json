@@ -73,7 +73,7 @@
       "id": "chaco",
       "name": "Provincia del Chaco",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar004_Chaco_2000x2500.png",
-      "imagePath": "/maps/CHACO-POL-MUDO-Nº3-2023.png",
+      "imagePath": "/maps/CHACO-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar004_Chaco_2000x2500.png",
       "category": "provincia",
       "isPortrait": false
@@ -109,7 +109,7 @@
       "id": "entre-rios",
       "name": "Provincia de Entre Ríos",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar006_EntreRios_2000x2500.png",
-      "imagePath": "/maps/ENTRE RIOS POL MUDO Nº3 2023.png",
+      "imagePath": "/maps/ENTRE-RIOS-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar006_EntreRios_2000x2500.png",
       "category": "provincia",
       "isPortrait": true
@@ -118,7 +118,7 @@
       "id": "formosa",
       "name": "Provincia de Formosa",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar020_Formosa_2500x2000.png",
-      "imagePath": "/maps/FORMOSA POL MUDO Nº3 2023.png",
+      "imagePath": "/maps/FORMOSA-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar020_Formosa_2500x2000.png",
       "category": "provincia",
       "isPortrait": false
@@ -127,7 +127,7 @@
       "id": "la-pampa",
       "name": "Provincia de La Pampa",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar007_LaPampa_2000x2500.png",
-      "imagePath": "/maps/LA PAMPA POL MUDO Nº3 2023.png",
+      "imagePath": "/maps/LA-PAMPA-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar007_LaPampa_2000x2500.png",
       "category": "provincia",
       "isPortrait": true
@@ -136,7 +136,7 @@
       "id": "la-rioja",
       "name": "Provincia de La Rioja",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar008_LaRioja_2000x2500.png",
-      "imagePath": "/maps/LA RIOJA POL MUDO Nº3 2023.png",
+      "imagePath": "/maps/LA-RIOJA-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar008_LaRioja_2000x2500.png",
       "category": "provincia",
       "isPortrait": true
@@ -145,7 +145,7 @@
       "id": "jujuy",
       "name": "Provincia de Jujuy",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar022_Jujuy_2500x2000.png",
-      "imagePath": "/maps/JUJUY POL MUDO Nº3 2023.png",
+      "imagePath": "/maps/JUJUY-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar022_Jujuy_2500x2000.png",
       "category": "provincia",
       "isPortrait": true
@@ -154,7 +154,7 @@
       "id": "mendoza",
       "name": "Provincia de Mendoza",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar009_Mendoza_2000x2500.png",
-      "imagePath": "/maps/MENDOZA POL MUDO Nº3 2023.png",
+      "imagePath": "/maps/MENDOZA-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar009_Mendoza_2000x2500.png",
       "category": "provincia",
       "isPortrait": true
@@ -163,7 +163,7 @@
       "id": "misiones",
       "name": "Provincia de Misiones",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar010_Misiones_2000x2500.png",
-      "imagePath": "/maps/MISIONES POL MUDO Nº3 2023.png",
+      "imagePath": "/maps/MISIONES-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar010_Misiones_2000x2500.png",
       "category": "provincia",
       "isPortrait": true
@@ -181,7 +181,7 @@
       "id": "rio-negro",
       "name": "Provincia de Río Negro",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar023_RioNegro_2500x2000.png",
-      "imagePath": "/maps/RIO NEGRO POL MUDO Nº3 2023.png",
+      "imagePath": "/maps/RIO-NEGRO-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar023_RioNegro_2500x2000.png",
       "category": "provincia",
       "isPortrait": false
@@ -190,7 +190,7 @@
       "id": "salta",
       "name": "Provincia de Salta",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar023_Salta_2500x2000.png",
-      "imagePath": "/maps/SALTA POL MUDO Nº3 2023.png",
+      "imagePath": "/maps/SALTA-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar023_Salta_2500x2000.png",
       "category": "provincia",
       "isPortrait": false
@@ -199,7 +199,7 @@
       "id": "san-juan",
       "name": "Provincia de San Juan",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar012_SanJuan_2000x2500.png",
-      "imagePath": "/maps/SAN JUAN POL MUDO Nº3 2023.png",
+      "imagePath": "/maps/SAN-JUAN-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar012_SanJuan_2000x2500.png",
       "category": "provincia",
       "isPortrait": true
@@ -208,7 +208,7 @@
       "id": "san-luis",
       "name": "Provincia de San Luis",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar013_SanLuis_2000x2500.png",
-      "imagePath": "/maps/SAN LUIS POL MUDO Nº3 2023.png",
+      "imagePath": "/maps/SAN-LUIS-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar013_SanLuis_2000x2500.png",
       "category": "provincia",
       "isPortrait": true
@@ -217,7 +217,7 @@
       "id": "santa-cruz",
       "name": "Provincia de Santa Cruz",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar015_SantaCruz_2000x2500.png",
-      "imagePath": "/maps/SANTA CRUZ POL MUDO Nº3 2023.png",
+      "imagePath": "/maps/SANTA-CRUZ-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar015_SantaCruz_2000x2500.png",
       "category": "provincia",
       "isPortrait": true
@@ -226,7 +226,7 @@
       "id": "santa-fe",
       "name": "Provincia de Santa Fe",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar014_SantaFe_2000x2500.png",
-      "imagePath": "/maps/SANTA FE POL MUDO Nº3 2023.png",
+      "imagePath": "/maps/SANTA-FE-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar014_SantaFe_2000x2500.png",
       "category": "provincia",
       "isPortrait": true
@@ -235,7 +235,7 @@
       "id": "santiago-del-estero",
       "name": "Provincia de Santiago del Estero",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar016_SantiagoDelEstero_2000x2500.png",
-      "imagePath": "/maps/SANTIAGO DEL ESTERO POL MUDO Nº3 2023.png",
+      "imagePath": "/maps/SANTIAGO-DEL-ESTERO-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar016_SantiagoDelEstero_2000x2500.png",
       "category": "provincia",
       "isPortrait": true
@@ -244,7 +244,7 @@
       "id": "tierra-del-fuego",
       "name": "Provincia de Tierra del Fuego, Antártida e Islas del Atlántico Sur",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar000_TIerraDelFuego_2000x2500.png",
-      "imagePath": "/maps/TDF PCIA Nº3 mudo 2023.png",
+      "imagePath": "/maps/TDF-PCIA-Nº3-MUDO-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar000_TIerraDelFuego_2000x2500.png",
       "category": "provincia",
       "isPortrait": false
@@ -261,7 +261,7 @@
       "id": "tucuman",
       "name": "Provincia de Tucumán",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar017_Tucuman_2000x2500.png ",
-      "imagePath": "/maps/TUCUMAN POL MUDO Nº3 2023.png",
+      "imagePath": "/maps/TUCUMAN-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar017_Tucuman_2000x2500.png",
       "category": "provincia",
       "isPortrait": true
@@ -270,7 +270,7 @@
       "id": "antartida",
       "name": "Mapa de Antártida",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar001_Antartida_2000x2500.png",
-      "imagePath": "/maps/TDF ANTARTIDA Nº3 mudo 2023.png",
+      "imagePath": "/maps/TDF-ANTARTIDA-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar001_Antartida_2000x2500.png",
       "category": "otros",
       "isPortrait": true
@@ -288,7 +288,7 @@
       "id": "amba",
       "name": "AMBA - Área Metropolitana Buenos Aires",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar000_AMBA_2000x2500.png",
-      "imagePath": "/maps/GBA POL MUDO Nº3 2023.png",
+      "imagePath": "/maps/GBA-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar000_AMBA_2000x2500.png",
       "category": "otros",
       "isPortrait": true
