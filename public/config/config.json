@@ -12,7 +12,7 @@
     {
       "id": "planisferio-aitoff",
       "name": "Planisferio Aitoff",
-      "thumbnailUrl": "/maps/thumbnails/MapaEscolar000_Planisferio_2000x2500.png",
+      "thumbnailUrl": "/maps/PLANISFERIO-AITOFF-Nº3_2023.webp",
       "imagePath": "/maps/PLANISFERIO-AITOFF-Nº3_2023.webp",
       "category": "otros",
       "isPortrait": false
@@ -37,7 +37,7 @@
     {
       "id": "argentina-pca",
       "name": "Mapa de Argentina Parte Continental Americana",
-      "thumbnailUrl": "/maps/thumbnails/MapaEscolar000_ArgentinaBicontinental_2000x2500.png",
+      "thumbnailUrl": "/maps/ARG-PCA-Nº3-mudo-2023.webp",
       "imagePath": "/maps/ARG-PCA-Nº3-mudo-2023.webp",
       "category": "otros",
       "isPortrait": true
