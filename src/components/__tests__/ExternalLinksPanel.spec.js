@@ -23,10 +23,10 @@ describe('ExternalLinksPanel', () => {
     expect(cards.length).toBe(4)
 
     const expectedUrls = [
-      'https://www.ign.gob.ar/',
-      'https://mapa.ign.gob.ar/',
+      'https://www.ign.gob.ar/AreaServicios/Descargas/MapasEscolares',
       'https://anida.ign.gob.ar/',
-      'https://www.ign.gob.ar/AreaServicios/Descargas/MapasEscolares'
+      'https://www.ign.gob.ar/',
+      'https://mapa.ign.gob.ar/'
     ]
 
     cards.forEach((card, index) => {

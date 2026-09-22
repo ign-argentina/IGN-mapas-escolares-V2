@@ -159,10 +159,12 @@ html[data-text-scale="xlarge"] {
 html:is([data-text-scale="large"], [data-text-scale="xlarge"]) :is(.nbi-properties, .nbi-stickers, .nbi-sidebar) {
   height: auto !important;
   max-height: 90vh !important;
+  max-height: 90dvh !important;
 }
 
 html:is([data-text-scale="large"], [data-text-scale="xlarge"]) .nbi-export-modal__body {
   max-height: calc(90vh - 180px);
+  max-height: calc(90dvh - 180px);
 }
 
 /* --- 4. TIPOGRAFÍA ACCESIBLE / LECTURA FÁCIL --- */

@@ -311,8 +311,33 @@ export class CanvasManager {
       }
     })
 
+    /**
+     * Extrae de forma segura las coordenadas de pantalla de un evento (Mouse, Pointer o Touch)
+     * @param {Event} e
+     * @returns {{x: number, y: number}|null}
+     */
+    const getPointerClientCoords = (e) => {
+      if (!e) return null
+      if (e.touches && e.touches.length > 0) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY }
+      }
+      if (e.changedTouches && e.changedTouches.length > 0) {
+        return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY }
+      }
+      if (typeof e.clientX === 'number' && typeof e.clientY === 'number') {
+        return { x: e.clientX, y: e.clientY }
+      }
+      return null
+    }
+
+    let isPinching = false
+    let startPinchDist = 0
+    let startPinchZoom = 1
+    let pinchCenter = { x: 0, y: 0 }
+
     canvas.on('mouse:wheel', (opt) => {
-      const delta = opt.e.deltaY
+      const e = opt.e
+      const delta = e.deltaY || 0
       let zoom = canvas.getZoom()
 
       zoom *= 0.999 ** delta
@@ -320,7 +345,10 @@ export class CanvasManager {
       if (zoom > 20) zoom = 20
       if (zoom < 0.02) zoom = 0.02
 
-      canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom)
+      const offsetX = typeof e.offsetX === 'number' ? e.offsetX : this.canvasWidth / 2
+      const offsetY = typeof e.offsetY === 'number' ? e.offsetY : this.canvasHeight / 2
+
+      canvas.zoomToPoint({ x: offsetX, y: offsetY }, zoom)
 
       opt.e.preventDefault()
       opt.e.stopPropagation()
@@ -328,18 +356,39 @@ export class CanvasManager {
 
     canvas.on('mouse:down', (opt) => {
       const e = opt.e
+      if (!e) return
+
+      // Soporte para gesto táctil de dos dedos (pinch-to-zoom)
+      if (e.touches && e.touches.length === 2) {
+        isDragging = false
+        isPinching = true
+        const t0 = e.touches[0]
+        const t1 = e.touches[1]
+        startPinchDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY)
+        startPinchZoom = canvas.getZoom()
+        const rect = this.container.getBoundingClientRect()
+        pinchCenter = {
+          x: (t0.clientX + t1.clientX) / 2 - rect.left,
+          y: (t0.clientY + t1.clientY) / 2 - rect.top,
+        }
+        return
+      }
+
       const isRightClick = e.button === 2 || e.which === 3
-      const isLeftClick = e.button === 0 || !e.button
+      const isLeftClick = e.button === 0 || e.button === undefined || e.button === null
 
       const shouldDrag = isSpacePressed || (this.activeTool === 'pan' && isLeftClick)
 
       if (shouldDrag) {
-        isDragging = true
-        canvas.selection = false
-        lastPosX = e.clientX
-        lastPosY = e.clientY
-        canvas.defaultCursor = 'grabbing'
-        canvas.setCursor('grabbing')
+        const coords = getPointerClientCoords(e)
+        if (coords && Number.isFinite(coords.x) && Number.isFinite(coords.y)) {
+          isDragging = true
+          canvas.selection = false
+          lastPosX = coords.x
+          lastPosY = coords.y
+          canvas.defaultCursor = 'grabbing'
+          canvas.setCursor('grabbing')
+        }
         return
       }
 
@@ -353,17 +402,45 @@ export class CanvasManager {
     })
 
     canvas.on('mouse:move', (opt) => {
+      const e = opt.e
+      if (!e) return
+
+      // Manejo de pellizco para zoom con dos dedos en pantallas táctiles
+      if (isPinching && e.touches && e.touches.length === 2) {
+        const t0 = e.touches[0]
+        const t1 = e.touches[1]
+        const currentDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY)
+        if (startPinchDist > 0 && currentDist > 0) {
+          let newZoom = startPinchZoom * (currentDist / startPinchDist)
+          if (newZoom > 20) newZoom = 20
+          if (newZoom < 0.02) newZoom = 0.02
+          canvas.zoomToPoint(pinchCenter, newZoom)
+        }
+        return
+      }
+
       if (isDragging) {
-        const e = opt.e
-        const vpt = canvas.viewportTransform
+        const coords = getPointerClientCoords(e)
+        if (
+          coords &&
+          Number.isFinite(coords.x) &&
+          Number.isFinite(coords.y) &&
+          Number.isFinite(lastPosX) &&
+          Number.isFinite(lastPosY)
+        ) {
+          const dx = coords.x - lastPosX
+          const dy = coords.y - lastPosY
+          const vpt = canvas.viewportTransform
 
-        vpt[4] += e.clientX - lastPosX
-        vpt[5] += e.clientY - lastPosY
+          if (Array.isArray(vpt) && vpt.length >= 6) {
+            vpt[4] += dx
+            vpt[5] += dy
+            canvas.requestRenderAll()
+          }
 
-        canvas.requestRenderAll()
-
-        lastPosX = e.clientX
-        lastPosY = e.clientY
+          lastPosX = coords.x
+          lastPosY = coords.y
+        }
         return
       }
 
@@ -371,6 +448,12 @@ export class CanvasManager {
     })
 
     canvas.on('mouse:up', (opt) => {
+      if (isPinching) {
+        if (!opt.e?.touches || opt.e.touches.length < 2) {
+          isPinching = false
+        }
+      }
+
       if (isDragging) {
         isDragging = false
         if (isSpacePressed || this.activeTool === 'pan') {

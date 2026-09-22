@@ -5,6 +5,9 @@
 .nbi-tour-welcome-dialog {
   width: 540px;
   max-width: 92vw;
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: var(--nbi-space-md);

@@ -58,7 +58,7 @@
 /* --- VISTA RESPONSIVA (CELULARES / PANTALLAS PEQUEÑAS) --- */
 @media (max-width: 768px) {
   .nbi-toolbar {
-    bottom: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom, 12px));
     max-width: calc(100vw - 16px);
     padding: 6px 8px;
     gap: 4px;

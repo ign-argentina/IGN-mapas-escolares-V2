@@ -107,6 +107,19 @@ export class MapSelector extends Component {
       if (card) {
         const mapId = card.id.replace('card-', '')
         appStore.dispatch({ type: 'SET_ACTIVE_MAP_ID', payload: mapId })
+
+        // En pantallas móviles, colapsar automáticamente el menú lateral para mostrar el mapa cargado
+        if (
+          typeof window !== 'undefined' &&
+          (window.innerWidth <= 768 || window.matchMedia?.('(max-width: 768px)')?.matches)
+        ) {
+          const closeBtn = document.getElementById('close-sidebar-btn')
+          if (closeBtn) {
+            closeBtn.click()
+          } else if (this.sidebarContainer) {
+            this.sidebarContainer.classList.add('is-collapsed')
+          }
+        }
       }
     })
 
@@ -117,6 +130,19 @@ export class MapSelector extends Component {
         e.preventDefault()
         const mapId = card.id.replace('card-', '')
         appStore.dispatch({ type: 'SET_ACTIVE_MAP_ID', payload: mapId })
+
+        // En pantallas móviles, colapsar automáticamente el menú lateral para mostrar el mapa cargado
+        if (
+          typeof window !== 'undefined' &&
+          (window.innerWidth <= 768 || window.matchMedia?.('(max-width: 768px)')?.matches)
+        ) {
+          const closeBtn = document.getElementById('close-sidebar-btn')
+          if (closeBtn) {
+            closeBtn.click()
+          } else if (this.sidebarContainer) {
+            this.sidebarContainer.classList.add('is-collapsed')
+          }
+        }
       }
     })
 

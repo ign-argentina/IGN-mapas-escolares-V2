@@ -342,14 +342,18 @@
 /* --- VISTA RESPONSIVA (CELULARES / PANTALLAS PEQUEÑAS) --- */
 @media (max-width: 768px) {
   .nbi-properties {
-    top: 100px;
+    top: 64px;
     right: 10px;
     max-width: calc(100vw - 20px);
+    max-height: calc(100dvh - 80px);
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .nbi-properties.is-collapsed {
     width: 60px;
     padding: var(--nbi-space-md) 4px;
+    overflow-y: visible;
   }
 
   .nbi-properties.is-collapsed #zoom-controls .nbi-btn,

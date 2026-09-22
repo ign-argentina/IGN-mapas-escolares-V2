@@ -4,6 +4,7 @@
   right: 295px;
   width: 260px;
   height: calc(100vh - 240px);
+  height: calc(100dvh - 240px);
   max-height: 380px;
   background-color: var(--nbi-color-panel-bg);
   display: flex;
@@ -124,4 +125,17 @@
 
 .nbi-stickers__item:hover .nbi-stickers__img {
   filter: grayscale(1) brightness(0.1);
+}
+
+/* --- VISTA RESPONSIVA (CELULARES / PANTALLAS PEQUEÑAS) --- */
+@media (max-width: 768px) {
+  .nbi-stickers {
+    top: 64px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: calc(100vw - 24px);
+    height: auto;
+    max-height: calc(100dvh - 150px);
+  }
 }

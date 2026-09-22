@@ -363,6 +363,8 @@
 @media (max-width: 768px) {
   .nbi-sidebar {
     left: -5px;
+    top: 64px;
+    bottom: max(16px, env(safe-area-inset-bottom, 16px));
     max-width: calc(100vw - 48px);
   }
 

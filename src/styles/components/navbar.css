@@ -48,3 +48,27 @@
   font-weight: var(--nbi-font-weight-semibold);
   opacity: 0.7;
 }
+
+/* --- VISTA RESPONSIVA (CELULARES / PANTALLAS PEQUEÑAS) --- */
+@media (max-width: 768px) {
+  .nbi-navbar {
+    top: 10px;
+    left: 10px;
+    min-width: 0;
+    max-width: calc(100vw - 20px);
+    height: 44px;
+    padding: 6px 12px;
+    gap: var(--nbi-space-sm);
+  }
+
+  .nbi-navbar__logo {
+    height: 24px;
+  }
+
+  .nbi-navbar__title {
+    font-size: var(--nbi-font-size-md);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
