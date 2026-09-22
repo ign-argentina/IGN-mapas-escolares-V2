@@ -37,6 +37,10 @@ export class ConfigRepository {
     }
   }
 
+  getDefaultMapId() {
+    return this.config?.defaultMapId || 'argentina'
+  }
+
   getMapImageSource() {
     return this.config?.mapImageSource || 'imageUrl'
   }

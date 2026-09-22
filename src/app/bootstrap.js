@@ -313,7 +313,8 @@ export async function bootstrap() {
     }
 
     // Mostrar modal de bienvenida únicamente si el usuario no ha descartado el aviso
-    if (!TourStorage.isTourAutoPromptDismissed('general-tour', 1)) {
+    let welcomeModal = null
+    if (TourStorage.shouldShowAutoPrompt('general', 1)) {
       const [
         { TourWelcomeModal },
         { generalTour }
@@ -322,7 +323,7 @@ export async function bootstrap() {
         import('../features/help-tour/tours/generalTour.js')
       ])
 
-      const welcomeModal = new TourWelcomeModal(document.body, {
+      welcomeModal = new TourWelcomeModal(document.body, {
         onStart: async ({ dontShowAgain }) => {
           if (dontShowAgain) {
             TourStorage.setTourAutoPromptDismissed(generalTour.id, generalTour.version)
@@ -364,14 +365,16 @@ export async function bootstrap() {
       window.lucide.createIcons()
     }
 
-    // 6. Activar por defecto la primera provincia del catálogo
+    // 6. Activar por defecto el mapa configurado (o 'argentina')
     const maps = await mapRepository.getAll()
     if (maps.length > 0) {
-      appStore.dispatch({ type: 'SET_ACTIVE_MAP_ID', payload: maps[0].id })
+      const defaultMapId = configRepository.getDefaultMapId()
+      const targetMap = maps.find((m) => m.id === defaultMapId) || maps[0]
+      appStore.dispatch({ type: 'SET_ACTIVE_MAP_ID', payload: targetMap.id })
     }
 
     // 7. Mostrar invitación automática en el primer arranque si corresponde
-    if (TourStorage.shouldShowAutoPrompt(generalTour.id, generalTour.version)) {
+    if (welcomeModal) {
       setTimeout(() => {
         welcomeModal.open()
       }, 700)

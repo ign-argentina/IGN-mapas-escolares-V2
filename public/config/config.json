@@ -1,4 +1,5 @@
 {
+  "defaultMapId": "argentina",
   "mapImageSource": "imagePath",
   "maps": [
     {

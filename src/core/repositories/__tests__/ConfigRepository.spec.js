@@ -7,6 +7,27 @@ describe('ConfigRepository', () => {
     configRepository.config = null
   })
 
+  it('debería retornar "argentina" por defecto si el config es nulo', () => {
+    expect(configRepository.getDefaultMapId()).toBe('argentina')
+  })
+
+  it('debería retornar "argentina" si no está especificada la propiedad defaultMapId en el config', () => {
+    configRepository.config = {
+      maps: [],
+      stickers: []
+    }
+    expect(configRepository.getDefaultMapId()).toBe('argentina')
+  })
+
+  it('debería retornar el defaultMapId configurado', () => {
+    configRepository.config = {
+      defaultMapId: 'cordoba',
+      maps: [],
+      stickers: []
+    }
+    expect(configRepository.getDefaultMapId()).toBe('cordoba')
+  })
+
   it('debería retornar "imageUrl" por defecto si el config es nulo', () => {
     expect(configRepository.getMapImageSource()).toBe('imageUrl')
   })
