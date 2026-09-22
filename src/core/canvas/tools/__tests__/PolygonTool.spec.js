@@ -10,7 +10,19 @@ vi.mock('fabric', () => {
         Object.assign(this, opts)
         this.type = 'polygon'
       }
-    }
+      setBoundingBox() {}
+      setCoords() {}
+    },
+    Circle: class {
+      constructor(opts) {
+        Object.assign(this, opts)
+        this.type = 'circle'
+      }
+      set(opts) {
+        Object.assign(this, opts)
+      }
+      setCoords() {}
+    },
   }
 })
 
@@ -34,6 +46,7 @@ describe('PolygonTool', () => {
         addObject: vi.fn(),
         removeObject: vi.fn(),
         requestRenderAll: vi.fn(),
+        fire: vi.fn(),
       },
     }
 
@@ -122,5 +135,67 @@ describe('PolygonTool', () => {
     expect(mockCanvasManager.onToolChange).toHaveBeenCalledWith('pan')
     expect(tool.points).toEqual([])
     expect(tool.previewShape).toBeNull()
+  })
+
+  it('debería permitir desarmar el último punto con undoLastPoint()', () => {
+    tool.onActivate()
+    tool.onMouseDown({ e: { clientX: 10, clientY: 20 } })
+    tool.onMouseDown({ e: { clientX: 50, clientY: 20 } })
+    tool.onMouseDown({ e: { clientX: 50, clientY: 60 } })
+    expect(tool.points.length).toBe(3)
+
+    tool.undoLastPoint()
+    expect(tool.points.length).toBe(2)
+    expect(mockCanvasManager.adapter.fire).toHaveBeenCalledWith(
+      'geometry:progress',
+      expect.objectContaining({ pointsCount: 2, canFinish: false })
+    )
+
+    tool.undoLastPoint()
+    expect(tool.points.length).toBe(1)
+
+    tool.undoLastPoint()
+    expect(tool.points.length).toBe(0)
+    expect(tool.previewShape).toBeNull()
+    expect(tool.startMarker).toBeNull()
+  })
+
+  it('debería finalizar dibujo mediante doble toque rápido de software (< 380ms)', () => {
+    vi.useFakeTimers()
+    tool.onActivate()
+    // Primer punto
+    tool.onMouseDown({ e: { clientX: 10, clientY: 10 } })
+    // Segundo punto
+    tool.onMouseDown({ e: { clientX: 50, clientY: 10 } })
+    // Tercer punto
+    tool.onMouseDown({ e: { clientX: 50, clientY: 50 } })
+    expect(tool.points.length).toBe(3)
+
+    // Toque rápido en el mismo lugar (< 380ms y distancia < 30px)
+    vi.advanceTimersByTime(150)
+    tool.onMouseDown({ e: { clientX: 52, clientY: 52 } })
+
+    expect(mockCanvasManager.finishCreatedObject).toHaveBeenCalled()
+    expect(mockCanvasManager.finishCreatedObject.mock.calls[0][0].type).toBe('polygon')
+    vi.useRealTimers()
+  })
+
+  it('debería finalizar dibujo al tocar el último vértice colocado', () => {
+    vi.useFakeTimers()
+    tool.onActivate()
+    tool.onMouseDown({ e: { clientX: 10, clientY: 10 } })
+    tool.onMouseDown({ e: { clientX: 50, clientY: 10 } })
+    tool.onMouseDown({ e: { clientX: 50, clientY: 50 } })
+    expect(tool.points.length).toBe(3)
+
+    // Simular que pasaron más de 400ms para no ser detectado como doble toque
+    vi.advanceTimersByTime(500)
+
+    // Tocar el último punto (clientX: 50, clientY: 50)
+    tool.onMouseDown({ e: { clientX: 55, clientY: 55 } })
+
+    expect(mockCanvasManager.finishCreatedObject).toHaveBeenCalled()
+    expect(mockCanvasManager.finishCreatedObject.mock.calls[0][0].type).toBe('polygon')
+    vi.useRealTimers()
   })
 })

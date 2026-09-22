@@ -34,6 +34,7 @@ describe('PolylineTool', () => {
         addObject: vi.fn(),
         removeObject: vi.fn(),
         requestRenderAll: vi.fn(),
+        fire: vi.fn(),
       },
     }
 
@@ -105,5 +106,57 @@ describe('PolylineTool', () => {
     expect(mockCanvasManager.onToolChange).toHaveBeenCalledWith('pan')
     expect(tool.points).toEqual([])
     expect(tool.previewShape).toBeNull()
+  })
+
+  it('debería permitir desarmar el último punto con undoLastPoint()', () => {
+    tool.onActivate()
+    tool.onMouseDown({ e: { clientX: 10, clientY: 20 } })
+    tool.onMouseDown({ e: { clientX: 30, clientY: 40 } })
+    expect(tool.points.length).toBe(2)
+
+    tool.undoLastPoint()
+    expect(tool.points.length).toBe(1)
+    expect(mockCanvasManager.adapter.fire).toHaveBeenCalledWith(
+      'geometry:progress',
+      expect.objectContaining({ pointsCount: 1, canFinish: false })
+    )
+
+    tool.undoLastPoint()
+    expect(tool.points.length).toBe(0)
+    expect(tool.previewShape).toBeNull()
+  })
+
+  it('debería finalizar dibujo mediante doble toque rápido de software (< 380ms)', () => {
+    vi.useFakeTimers()
+    tool.onActivate()
+    tool.onMouseDown({ e: { clientX: 10, clientY: 10 } })
+    tool.onMouseDown({ e: { clientX: 50, clientY: 50 } })
+    expect(tool.points.length).toBe(2)
+
+    // Toque rápido en el mismo lugar (< 380ms y distancia < 30px)
+    vi.advanceTimersByTime(150)
+    tool.onMouseDown({ e: { clientX: 52, clientY: 52 } })
+
+    expect(mockCanvasManager.finishCreatedObject).toHaveBeenCalled()
+    expect(mockCanvasManager.finishCreatedObject.mock.calls[0][0].type).toBe('polyline')
+    vi.useRealTimers()
+  })
+
+  it('debería finalizar dibujo al tocar el último vértice colocado', () => {
+    vi.useFakeTimers()
+    tool.onActivate()
+    tool.onMouseDown({ e: { clientX: 10, clientY: 10 } })
+    tool.onMouseDown({ e: { clientX: 50, clientY: 50 } })
+    expect(tool.points.length).toBe(2)
+
+    // Simular que pasaron más de 400ms para no ser detectado como doble toque
+    vi.advanceTimersByTime(500)
+
+    // Tocar el último punto
+    tool.onMouseDown({ e: { clientX: 55, clientY: 55 } })
+
+    expect(mockCanvasManager.finishCreatedObject).toHaveBeenCalled()
+    expect(mockCanvasManager.finishCreatedObject.mock.calls[0][0].type).toBe('polyline')
+    vi.useRealTimers()
   })
 })

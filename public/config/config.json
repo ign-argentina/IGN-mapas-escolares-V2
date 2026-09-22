@@ -82,7 +82,7 @@
       "id": "chubut",
       "name": "Provincia del Chubut",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar018_Chubut_2500x2000.png",
-      "imagePath": "/maps/CHUBUT-POL-MUDO-Nº3-2023.png",
+      "imagePath": "/maps/CHUBUT-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar018_Chubut_2500x2000.png",
       "category": "provincia",
       "isPortrait": false
@@ -172,7 +172,7 @@
       "id": "neuquen",
       "name": "Provincia del Neuquén",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar011_Neuquén_2000x2500.png",
-      "imagePath": "/maps/NEUQUEN POL MUDO Nº3 2023.png",
+      "imagePath": "/maps/NEUQUEN-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar011_Neuquén_2000x2500.png",
       "category": "provincia",
       "isPortrait": true
@@ -252,8 +252,8 @@
     {
       "id": "isla-grande-tierra-del-fuego",
       "name": "Isla Grande de Tierra del Fuego  e Islas del Atlántico Sur",
-      "thumbnailUrl": "/maps/TDF ISLA GRANDE POL MUDO Nº3_2023.png",
-      "imagePath": "/maps/TDF ISLA GRANDE POL MUDO Nº3_2023.png",
+      "thumbnailUrl": "/maps/TDF-ISLA-GRANDE-POL-MUDO-Nº3_2023.webp",
+      "imagePath": "/maps/TDF-ISLA-GRANDE-POL-MUDO-Nº3_2023.webp",
       "category": "provincia",
       "isPortrait": true
     },
@@ -279,7 +279,7 @@
       "id": "malvinas",
       "name": "Islas Malvinas",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar021_IslasMalvinas_2500x2000.png",
-      "imagePath": "/maps/TDF MALVINAS POL MUDO Nº3_2023.png",
+      "imagePath": "/maps/TDF-MALVINAS-POL-MUDO-Nº3-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar021_IslasMalvinas_2500x2000.png",
       "category": "otros",
       "isPortrait": false

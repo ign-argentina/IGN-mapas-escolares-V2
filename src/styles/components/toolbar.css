@@ -55,6 +55,65 @@
   display: none !important;
 }
 
+/* --- BARRA FLOTANTE CONTEXTUAL DE TRAZADO (POLÍGONO / POLILÍNEA) --- */
+.nbi-geometry-actions {
+  position: absolute;
+  bottom: calc(var(--nbi-space-xl) + 68px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--nbi-z-floating);
+  display: flex;
+  align-items: center;
+  gap: var(--nbi-space-sm);
+  background-color: var(--nbi-color-panel-bg);
+  border: var(--nbi-border-width-md) solid var(--nbi-color-black);
+  border-radius: var(--nbi-radius-panel);
+  box-shadow: var(--nbi-shadow-lg);
+  padding: 8px 12px;
+  transition: transform var(--nbi-transition-normal), opacity var(--nbi-transition-normal);
+  pointer-events: auto;
+}
+
+.nbi-geometry-actions.hidden {
+  display: none !important;
+}
+
+.nbi-geometry-actions__badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--nbi-color-white);
+  border: var(--nbi-border-width-sm) solid var(--nbi-color-black);
+  border-radius: var(--nbi-radius-pill);
+  padding: 4px 10px;
+  font-size: var(--nbi-font-size-sm);
+  font-weight: var(--nbi-font-weight-bold);
+  color: var(--nbi-color-black);
+  white-space: nowrap;
+}
+
+.nbi-geometry-actions__badge svg,
+.nbi-geometry-actions__badge .lucide {
+  width: 14px;
+  height: 14px;
+  stroke: var(--nbi-color-primary);
+  stroke-width: 2.5px;
+}
+
+.nbi-geometry-actions .nbi-btn {
+  min-height: 38px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  font-weight: var(--nbi-font-weight-bold);
+  gap: 6px;
+}
+
+.nbi-geometry-actions .nbi-btn svg,
+.nbi-geometry-actions .nbi-btn .lucide {
+  width: 16px;
+  height: 16px;
+}
+
 /* --- VISTA RESPONSIVA (CELULARES / PANTALLAS PEQUEÑAS) --- */
 @media (max-width: 768px) {
   .nbi-toolbar {
@@ -121,5 +180,18 @@
     grid-template-columns: repeat(3, 38px);
     gap: 6px;
     justify-content: center;
+  }
+
+  .nbi-geometry-actions {
+    bottom: calc(max(12px, env(safe-area-inset-bottom, 12px)) + 58px);
+    max-width: calc(100vw - 16px);
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .nbi-geometry-actions .nbi-btn {
+    min-height: 38px;
+    padding: 6px 10px;
+    font-size: 0.8rem;
   }
 }

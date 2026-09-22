@@ -89,6 +89,25 @@
       <div id="editor-container" class="canvas-root" data-tour="canvas-area"></div>
     </main>
 
+    <!-- BARRA CONTEXTUAL DE ACCIONES PARA TRAZADO DE POLÍGONOS / POLILÍNEAS -->
+    <div class="nbi-geometry-actions hidden" id="geometry-actions" role="region" aria-label="Controles de trazado de figura">
+      <div class="nbi-geometry-actions__badge" id="geometry-points-badge">
+        <i data-lucide="circle-dot"></i>
+        <span id="geometry-points-count">0 puntos</span>
+      </div>
+      <button class="nbi-btn nbi-btn--sm" id="geometry-btn-undo" title="Deshacer último punto" aria-label="Deshacer último punto" disabled>
+        <i data-lucide="undo-2"></i>
+        <span class="btn-text">Paso atrás</span>
+      </button>
+      <button class="nbi-btn nbi-btn--sm nbi-btn--success" id="geometry-btn-finish" title="Cerrar y finalizar figura" aria-label="Cerrar y finalizar figura" disabled>
+        <i data-lucide="check"></i>
+        <span class="btn-text">Finalizar</span>
+      </button>
+      <button class="nbi-btn nbi-btn--sm nbi-btn--danger" id="geometry-btn-cancel" title="Cancelar figura" aria-label="Cancelar figura">
+        <i data-lucide="x"></i>
+      </button>
+    </div>
+
     <!-- BARRA DE HERRAMIENTAS FLOTANTE -->
     <div class="nbi-toolbar" id="toolbar-drawing" role="toolbar" aria-label="Herramientas de dibujo">
       <div class="nbi-toolbar__group" data-tour="tools-navigation">

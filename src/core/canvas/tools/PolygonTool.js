@@ -9,12 +9,20 @@ export class PolygonTool extends BaseTool {
     super(canvasManager)
     this.points = []
     this.previewShape = null
+    this.startMarker = null
+    this._activatedAt = 0
+    this._lastTapTime = 0
+    this._lastTapPoint = null
   }
 
   onActivate() {
     this.points = []
     this.previewShape = null
+    this.startMarker = null
     this._activatedAt = Date.now()
+    this._lastTapTime = 0
+    this._lastTapPoint = null
+    this.notifyProgress()
   }
 
   onDeactivate() {
@@ -23,6 +31,7 @@ export class PolygonTool extends BaseTool {
     } else {
       this.cleanup()
     }
+    this.notifyProgress()
   }
 
   cleanup() {
@@ -30,8 +39,15 @@ export class PolygonTool extends BaseTool {
       this.canvasManager.adapter.removeObject(this.previewShape)
       this.previewShape = null
     }
+    if (this.startMarker) {
+      this.canvasManager.adapter.removeObject(this.startMarker)
+      this.startMarker = null
+    }
     this.points = []
+    this._lastTapTime = 0
+    this._lastTapPoint = null
     this.canvasManager.adapter.requestRenderAll()
+    this.notifyProgress()
   }
 
   cancelDrawing() {
@@ -42,22 +58,72 @@ export class PolygonTool extends BaseTool {
     }
   }
 
+  undoLastPoint() {
+    if (this.points.length === 0) return
+    this.points.pop()
+    this._lastTapTime = 0
+    this._lastTapPoint = null
+    this.updatePreview(null)
+    this.notifyProgress()
+  }
+
+  notifyProgress() {
+    if (this.canvasManager?.adapter?.fire) {
+      this.canvasManager.adapter.fire('geometry:progress', {
+        tool: 'polygon',
+        pointsCount: this.points.length,
+        minPoints: 3,
+        canFinish: this.points.length >= 3,
+      })
+    }
+  }
+
   onMouseDown(opt) {
     const pointer = this.canvasManager.adapter.getScenePoint(opt.e)
+    const now = Date.now()
 
-    // Si ya tenemos suficientes puntos, verificar si el clic es cerca del primer punto
-    // para cerrar el polígono y finalizar
+    // 1. Cierre al pulsar cerca del punto de inicio (tolerancia de 30px apta para dedos)
     if (this.points.length >= 3) {
       const firstPoint = this.points[0]
       const dist = Math.hypot(pointer.x - firstPoint.x, pointer.y - firstPoint.y)
-      if (dist < 12) { // Tolerancia de 12px para cerrar el polígono
+      const zoom = this.canvasManager.canvas?.getZoom?.() || 1
+      const screenDist = dist * zoom
+      if (dist < 30 || screenDist < 35) {
+        this._lastTapTime = 0
+        this._lastTapPoint = null
         this.finishDrawing()
         return
       }
     }
 
+    // 2. Detección de doble toque táctil por software (< 380ms y distancia < 30px)
+    if (this._lastTapTime && now - this._lastTapTime < 380 && this._lastTapPoint) {
+      const tapDist = Math.hypot(pointer.x - this._lastTapPoint.x, pointer.y - this._lastTapPoint.y)
+      if (tapDist < 30 && this.points.length >= 3) {
+        this._lastTapTime = 0
+        this._lastTapPoint = null
+        this.finishDrawing()
+        return
+      }
+    }
+
+    // 3. Tocar el último vértice colocado para finalizar (si ya hay al menos 3 puntos)
+    if (this.points.length >= 3) {
+      const lastPoint = this.points[this.points.length - 1]
+      const distToLast = Math.hypot(pointer.x - lastPoint.x, pointer.y - lastPoint.y)
+      if (distToLast < 25) {
+        this._lastTapTime = 0
+        this._lastTapPoint = null
+        this.finishDrawing()
+        return
+      }
+    }
+
+    this._lastTapTime = now
+    this._lastTapPoint = pointer
     this.points.push(pointer)
     this.updatePreview(null)
+    this.notifyProgress()
   }
 
   onMouseMove(opt) {
@@ -90,13 +156,43 @@ export class PolygonTool extends BaseTool {
         })
         this.canvasManager.adapter.addObject(this.previewShape)
       }
+
+      // Marcador visual sobre el punto inicial para guiar el cierre táctil
+      if (this.points.length >= 2) {
+        if (!this.startMarker) {
+          this.startMarker = ShapeFactory.createCircle({
+            left: this.points[0].x,
+            top: this.points[0].y,
+            radius: 8,
+            color: '#7ABE7D',
+            stroke: '#000000',
+            strokeWidth: 2,
+            selectable: false,
+            evented: false,
+          })
+          this.canvasManager.adapter.addObject(this.startMarker)
+        } else {
+          this.startMarker.set({ left: this.points[0].x, top: this.points[0].y })
+          if (typeof this.startMarker.setCoords === 'function') {
+            this.startMarker.setCoords()
+          }
+        }
+      } else if (this.startMarker) {
+        this.canvasManager.adapter.removeObject(this.startMarker)
+        this.startMarker = null
+      }
+
       this.canvasManager.adapter.requestRenderAll()
     } else {
+      if (this.startMarker) {
+        this.canvasManager.adapter.removeObject(this.startMarker)
+        this.startMarker = null
+      }
       if (this.previewShape) {
         this.canvasManager.adapter.removeObject(this.previewShape)
         this.previewShape = null
-        this.canvasManager.adapter.requestRenderAll()
       }
+      this.canvasManager.adapter.requestRenderAll()
     }
   }
 
@@ -131,6 +227,11 @@ export class PolygonTool extends BaseTool {
   }
 
   finishDrawing() {
+    if (this.startMarker) {
+      this.canvasManager.adapter.removeObject(this.startMarker)
+      this.startMarker = null
+    }
+
     // Filtrar puntos duplicados consecutivos
     const uniquePoints = []
     for (const pt of this.points) {
@@ -164,5 +265,8 @@ export class PolygonTool extends BaseTool {
       this.cleanup()
     }
     this.points = []
+    this._lastTapTime = 0
+    this._lastTapPoint = null
+    this.notifyProgress()
   }
 }

@@ -45,6 +45,13 @@ export class Toolbar extends Component {
       })
     }
 
+    // Controles contextuales de finalización para trazado de polígonos / polilíneas
+    this.geometryActionsEl = document.getElementById('geometry-actions')
+    this.geometryPointsCountEl = document.getElementById('geometry-points-count')
+    this.geometryUndoBtn = document.getElementById('geometry-btn-undo')
+    this.geometryFinishBtn = document.getElementById('geometry-btn-finish')
+    this.geometryCancelBtn = document.getElementById('geometry-btn-cancel')
+
     if (window.lucide) {
       window.lucide.createIcons()
     }
@@ -57,6 +64,9 @@ export class Toolbar extends Component {
       this.sidebar.close()
     }
     this.closeOverflowMenu()
+    if (toolName !== 'polyline' && toolName !== 'polygon') {
+      this.hideGeometryActions()
+    }
     if (typeof this.onCanvasToolActivated === 'function') {
       this.onCanvasToolActivated(toolName)
     }
@@ -155,9 +165,97 @@ export class Toolbar extends Component {
       })
     }
 
+    // Botones de acción para finalización / cancelación de trazado de polígonos y polilíneas
+    if (this.geometryUndoBtn) {
+      this.addEvent(this.geometryUndoBtn, 'click', (e) => {
+        e.preventDefault()
+        const activeTool = this.canvasManager?.toolService?.activeTool
+        if (activeTool && typeof activeTool.undoLastPoint === 'function') {
+          activeTool.undoLastPoint()
+        }
+      })
+    }
+
+    if (this.geometryFinishBtn) {
+      this.addEvent(this.geometryFinishBtn, 'click', (e) => {
+        e.preventDefault()
+        const activeTool = this.canvasManager?.toolService?.activeTool
+        if (activeTool && typeof activeTool.finishDrawing === 'function') {
+          activeTool.finishDrawing()
+        }
+      })
+    }
+
+    if (this.geometryCancelBtn) {
+      this.addEvent(this.geometryCancelBtn, 'click', (e) => {
+        e.preventDefault()
+        const activeTool = this.canvasManager?.toolService?.activeTool
+        if (activeTool && typeof activeTool.cancelDrawing === 'function') {
+          activeTool.cancelDrawing()
+        }
+      })
+    }
+
+    // Escuchar eventos de progreso geométrico disparados por PolygonTool / PolylineTool
+    if (this.canvasManager?.adapter) {
+      this.unsubscribeGeometry = this.canvasManager.adapter.on('geometry:progress', (data) => {
+        this.updateGeometryActionsUI(data)
+      })
+    }
+
     // Escuchar eventos de cambio de herramientas disparados internamente en CanvasManager
     this.canvasManager.onToolChange = (activeTool) => {
       this.updateActiveToolUI(activeTool)
+      if (activeTool !== 'polyline' && activeTool !== 'polygon') {
+        this.hideGeometryActions()
+      }
+    }
+  }
+
+  unbindEvents() {
+    super.unbindEvents()
+    if (typeof this.unsubscribeGeometry === 'function') {
+      this.unsubscribeGeometry()
+      this.unsubscribeGeometry = null
+    }
+  }
+
+  updateGeometryActionsUI(data = {}) {
+    if (!this.geometryActionsEl) return
+    const { tool, pointsCount = 0, canFinish = false } = data
+
+    if (!pointsCount || pointsCount === 0 || (tool !== 'polyline' && tool !== 'polygon')) {
+      this.hideGeometryActions()
+      return
+    }
+
+    this.geometryActionsEl.classList.remove('hidden')
+
+    if (this.geometryPointsCountEl) {
+      this.geometryPointsCountEl.textContent = `${pointsCount} ${pointsCount === 1 ? 'punto' : 'puntos'}`
+    }
+
+    if (this.geometryFinishBtn) {
+      this.geometryFinishBtn.disabled = !canFinish
+    }
+
+    if (this.geometryUndoBtn) {
+      this.geometryUndoBtn.disabled = pointsCount <= 0
+    }
+  }
+
+  hideGeometryActions() {
+    if (this.geometryActionsEl) {
+      this.geometryActionsEl.classList.add('hidden')
+    }
+    if (this.geometryPointsCountEl) {
+      this.geometryPointsCountEl.textContent = '0 puntos'
+    }
+    if (this.geometryFinishBtn) {
+      this.geometryFinishBtn.disabled = true
+    }
+    if (this.geometryUndoBtn) {
+      this.geometryUndoBtn.disabled = true
     }
   }
 
