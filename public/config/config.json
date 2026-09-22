@@ -245,7 +245,7 @@
       "id": "tierra-del-fuego",
       "name": "Provincia de Tierra del Fuego, Antártida e Islas del Atlántico Sur",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar000_TIerraDelFuego_2000x2500.png",
-      "imagePath": "/maps/TDF-PCIA-Nº3-MUDO-2023.webp",
+      "imagePath": "/maps/TDF-PCIA-Nº3-mudo-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar000_TIerraDelFuego_2000x2500.png",
       "category": "provincia",
       "isPortrait": false
@@ -271,7 +271,7 @@
       "id": "antartida",
       "name": "Mapa de Antártida",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar001_Antartida_2000x2500.png",
-      "imagePath": "/maps/TDF-ANTARTIDA-POL-MUDO-Nº3-2023.webp",
+      "imagePath": "/maps/TDF-ANTARTIDA-Nº3-mudo-2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar001_Antartida_2000x2500.png",
       "category": "otros",
       "isPortrait": true
@@ -280,7 +280,7 @@
       "id": "malvinas",
       "name": "Islas Malvinas",
       "thumbnailUrl": "/maps/thumbnails/MapaEscolar021_IslasMalvinas_2500x2000.png",
-      "imagePath": "/maps/TDF-MALVINAS-POL-MUDO-Nº3-2023.webp",
+      "imagePath": "/maps/TDF-MALVINAS-POL-MUDO-Nº3_2023.webp",
       "imageUrl": "https://mapasescolares.ign.gob.ar/images/mapas/MapaEscolar021_IslasMalvinas_2500x2000.png",
       "category": "otros",
       "isPortrait": false
