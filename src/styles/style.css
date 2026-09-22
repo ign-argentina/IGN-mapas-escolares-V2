@@ -1,4 +1,5 @@
 @import './settings/tokens.css';
+@import './generic/fonts.css';
 @import './generic/reset.css';
 @import './elements/base.css';
 @import './layout/app-layout.css';
@@ -33,4 +34,4 @@
 
 
 
-
+

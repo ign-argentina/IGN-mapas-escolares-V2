@@ -1,7 +1,6 @@
 import { FabricImage } from 'fabric'
 import { FabricAdapter } from './canvas/FabricAdapter.js'
 import { ShapeFactory } from './canvas/ShapeFactory.js'
-import { ExportService } from './export/ExportService.js'
 import { ToolService } from './canvas/tools/ToolService.js'
 
 import { ResizeManager } from './utils/ResizeManager.js'
@@ -890,8 +889,9 @@ export class CanvasManager {
     }
   }
 
-  exportToPNG(fileName = 'mapa_anotado.png') {
-    ExportService.exportToPNG(this, fileName)
+  async exportToPNG(fileName = 'mapa_anotado.png') {
+    const { ExportService } = await import('./export/ExportService.js')
+    return ExportService.exportToPNG(this, fileName)
   }
 
   dispose() {

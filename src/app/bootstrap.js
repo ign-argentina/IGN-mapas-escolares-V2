@@ -7,15 +7,11 @@ import { AccessibilityPanel } from '../components/AccessibilityPanel.js'
 import { HelpPanel } from '../components/HelpPanel.js'
 import { AccessibilityManager } from '../core/accessibility/AccessibilityManager.js'
 import { ContextMenu } from '../features/context-menu/ContextMenu.js'
-import { ExportModal } from '../features/export-modal/ExportModal.js'
 import { Toolbar } from '../features/toolbar/Toolbar.js'
 import { ColorPalette } from '../features/color-palette/ColorPalette.js'
 import { StickersPanel } from '../features/stickers-panel/StickersPanel.js'
 import { configRepository } from '../core/repositories/ConfigRepository.js'
 import { mapRepository } from '../core/repositories/MapRepository.js'
-import { TourController } from '../features/help-tour/TourController.js'
-import { generalTour } from '../features/help-tour/tours/generalTour.js'
-import { TourWelcomeModal } from '../features/help-tour/TourWelcomeModal.js'
 import { TourStorage } from '../features/help-tour/TourStorage.js'
 import { ExternalLinksPanel } from '../components/ExternalLinksPanel.js'
 
@@ -138,26 +134,23 @@ export async function bootstrap() {
   // --- INICIALIZACIÓN ASÍNCRONA DE CONFIGURACIÓN Y COMPONENTES ---
   loaderOverlay.classList.remove('hidden')
   try {
-    // 1. Cargar la configuración remota JSON
-    await configRepository.load()
-    const uiConfig = configRepository.getUiConfig()
-
-    // Cargar dinámicamente custom.css o el fallback default/custom.css
-    const cssLink = document.createElement('link')
-    cssLink.rel = 'stylesheet'
+    // 1. Cargar la configuración remota JSON y resolver custom.css en paralelo
     const customCssUrl = `${import.meta.env.BASE_URL}config/custom.css`
     const defaultCssUrl = `${import.meta.env.BASE_URL}config/default/custom.css`
-    try {
-      const resp = await fetch(customCssUrl, { method: 'HEAD' })
-      if (resp.ok) {
-        cssLink.href = customCssUrl
-      } else {
+    const loadCssPromise = (async () => {
+      const cssLink = document.createElement('link')
+      cssLink.rel = 'stylesheet'
+      try {
+        const resp = await fetch(customCssUrl, { method: 'HEAD' })
+        cssLink.href = resp.ok ? customCssUrl : defaultCssUrl
+      } catch {
         cssLink.href = defaultCssUrl
       }
-    } catch {
-      cssLink.href = defaultCssUrl
-    }
-    document.head.appendChild(cssLink)
+      document.head.appendChild(cssLink)
+    })()
+
+    await Promise.all([configRepository.load(), loadCssPromise])
+    const uiConfig = configRepository.getUiConfig()
 
     // Inyectar paleta de colores del tema en variables CSS del :root
     if (uiConfig.theme) {
@@ -274,14 +267,18 @@ export async function bootstrap() {
       document.getElementById('stickers-panel') || editorContainer,
       { canvasManager }
     )
-    await stickersPanel.render()
-    stickersPanel.bindEvents()
+    stickersPanel.mount()
 
     new ContextMenu(canvasManager)
 
-    const exportModal = new ExportModal(canvasManager, mapRepository)
-    document.getElementById('action-export')?.addEventListener('click', () => {
-      exportModal.open()
+    // Carga diferida (lazy loading) del modal de exportación
+    let exportModalInstance = null
+    document.getElementById('action-export')?.addEventListener('click', async () => {
+      if (!exportModalInstance) {
+        const { ExportModal } = await import('../features/export-modal/ExportModal.js')
+        exportModalInstance = new ExportModal(canvasManager, mapRepository)
+      }
+      exportModalInstance.open()
     })
 
     const mapSelector = new MapSelector(
@@ -296,34 +293,59 @@ export async function bootstrap() {
     )
     accessibilityPanel.mount()
 
-    // 5. Inicializar controlador y modal de bienvenida del recorrido guiado
-    const tourController = new TourController({
-      canvasManager,
-      sidebar,
-      appStore
-    })
-
-    const welcomeModal = new TourWelcomeModal(document.body, {
-      onStart: ({ dontShowAgain }) => {
-        if (dontShowAgain) {
-          TourStorage.setTourAutoPromptDismissed(generalTour.id, generalTour.version)
-        }
-        tourController.start(generalTour)
-      },
-      onDismiss: ({ dontShowAgain }) => {
-        if (dontShowAgain) {
-          TourStorage.setTourAutoPromptDismissed(generalTour.id, generalTour.version)
+    // 5. Inicialización bajo demanda del recorrido guiado (Tour)
+    let tourControllerInstance = null
+    const getTour = async () => {
+      if (!tourControllerInstance) {
+        const [
+          { TourController },
+          { generalTour }
+        ] = await Promise.all([
+          import('../features/help-tour/TourController.js'),
+          import('../features/help-tour/tours/generalTour.js')
+        ])
+        tourControllerInstance = {
+          controller: new TourController({ canvasManager, sidebar, appStore }),
+          generalTour
         }
       }
-    })
-    welcomeModal.mount()
+      return tourControllerInstance
+    }
+
+    // Mostrar modal de bienvenida únicamente si el usuario no ha descartado el aviso
+    if (!TourStorage.isTourAutoPromptDismissed('general-tour', 1)) {
+      const [
+        { TourWelcomeModal },
+        { generalTour }
+      ] = await Promise.all([
+        import('../features/help-tour/TourWelcomeModal.js'),
+        import('../features/help-tour/tours/generalTour.js')
+      ])
+
+      const welcomeModal = new TourWelcomeModal(document.body, {
+        onStart: async ({ dontShowAgain }) => {
+          if (dontShowAgain) {
+            TourStorage.setTourAutoPromptDismissed(generalTour.id, generalTour.version)
+          }
+          const { controller, generalTour: tour } = await getTour()
+          controller.start(tour)
+        },
+        onDismiss: ({ dontShowAgain }) => {
+          if (dontShowAgain) {
+            TourStorage.setTourAutoPromptDismissed(generalTour.id, generalTour.version)
+          }
+        }
+      })
+      welcomeModal.mount()
+    }
 
     const helpViewContainer = sidebarContainer.querySelector('#view-help')
     if (helpViewContainer) {
       const helpPanel = new HelpPanel(helpViewContainer, {
-        onStartTour: (e) => {
+        onStartTour: async (e) => {
           const triggerEl = e && e.currentTarget ? e.currentTarget : null
-          tourController.start(generalTour, triggerEl)
+          const { controller, generalTour } = await getTour()
+          controller.start(generalTour, triggerEl)
         }
       })
       helpPanel.mount()

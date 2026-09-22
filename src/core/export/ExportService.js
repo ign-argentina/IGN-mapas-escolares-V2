@@ -1,4 +1,3 @@
-import { jsPDF } from 'jspdf'
 import { appStore } from '../../state/AppStore.js'
 import { configRepository } from '../repositories/ConfigRepository.js'
 import { mapRepository } from '../repositories/MapRepository.js'
@@ -182,6 +181,7 @@ export class ExportService {
         targetHeight: targetHeightPx,
       })
 
+      const { jsPDF } = await import('jspdf')
       const doc = new jsPDF({
         orientation: orientation,
         unit: 'mm',
