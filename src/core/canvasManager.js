@@ -256,7 +256,7 @@ export class CanvasManager {
     let lastPosX = 0
     let lastPosY = 0
     let isSpacePressed = false
-    window.addEventListener('keydown', (e) => {
+    const handleKeyDown = (e) => {
       const activeElement = document.activeElement
       const isInputFocused = activeElement && (
         activeElement.tagName === 'INPUT' ||
@@ -289,9 +289,9 @@ export class CanvasManager {
           this.handleKeyDown(e)
         }
       }
-    })
+    }
 
-    window.addEventListener('keyup', (e) => {
+    const handleKeyUp = (e) => {
       if (e.code === 'Space') {
         isSpacePressed = false
         if (this.activeTool === 'pan') {
@@ -308,7 +308,14 @@ export class CanvasManager {
           canvas.selection = false
         }
       }
-    })
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    this._keyCleanup = () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
 
     /**
      * Extrae de forma segura las coordenadas de pantalla de un evento (Mouse, Pointer o Touch)
@@ -330,9 +337,175 @@ export class CanvasManager {
     }
 
     let isPinching = false
-    let startPinchDist = 0
-    let startPinchZoom = 1
-    let pinchCenter = { x: 0, y: 0 }
+    let lastPinchDist = 0
+    let lastPinchCenter = { x: 0, y: 0 }
+
+    const getTargetRect = () => {
+      const el = this.canvas?.upperCanvasEl || this.canvasEl || this.container
+      return el.getBoundingClientRect()
+    }
+
+    const startPinch = (t0, t1) => {
+      isDragging = false
+      isPinching = true
+      lastPinchDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY)
+      const rect = getTargetRect()
+      lastPinchCenter = {
+        x: (t0.clientX + t1.clientX) / 2 - rect.left,
+        y: (t0.clientY + t1.clientY) / 2 - rect.top,
+      }
+
+      // Limpiar figuras temporales de un solo dedo si se estaba trazando (rect, circle, arrow)
+      const tool = this.toolService?.activeTool
+      if (tool && tool.isDrawing && typeof tool.cleanup === 'function') {
+        tool.cleanup()
+      }
+
+      // Si el pincel libre estaba dibujando, cancelar el trazo en curso
+      if (canvas.isDrawingMode) {
+        canvas._isCurrentlyDrawing = false
+        if (canvas.freeDrawingBrush && canvas.freeDrawingBrush._points) {
+          canvas.freeDrawingBrush._points = []
+        }
+        canvas.requestRenderAll()
+      }
+    }
+
+    const movePinch = (t0, t1) => {
+      if (!isPinching) return
+      const currentDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY)
+      const rect = getTargetRect()
+      const currentCenter = {
+        x: (t0.clientX + t1.clientX) / 2 - rect.left,
+        y: (t0.clientY + t1.clientY) / 2 - rect.top,
+      }
+
+      if (lastPinchDist > 0 && currentDist > 0) {
+        const scaleDelta = currentDist / lastPinchDist
+        let currentZoom = canvas.getZoom()
+        let newZoom = currentZoom * scaleDelta
+        if (newZoom > 20) newZoom = 20
+        if (newZoom < 0.02) newZoom = 0.02
+
+        // 1. Zoom con respecto al centro anterior
+        canvas.zoomToPoint(lastPinchCenter, newZoom)
+
+        // 2. Desplazamiento por el movimiento del centro (paneo con dos dedos)
+        const dx = currentCenter.x - lastPinchCenter.x
+        const dy = currentCenter.y - lastPinchCenter.y
+        if (dx !== 0 || dy !== 0) {
+          const vpt = canvas.viewportTransform
+          if (Array.isArray(vpt) && vpt.length >= 6) {
+            vpt[4] += dx
+            vpt[5] += dy
+            if (typeof canvas.setViewportTransform === 'function') {
+              canvas.setViewportTransform(vpt)
+            }
+          }
+        }
+        canvas.requestRenderAll()
+      }
+
+      lastPinchDist = currentDist
+      lastPinchCenter = currentCenter
+    }
+
+    const endPinch = (remainingTouches = []) => {
+      isPinching = false
+      lastPinchDist = 0
+      if (remainingTouches.length === 1) {
+        lastPosX = remainingTouches[0].clientX
+        lastPosY = remainingTouches[0].clientY
+        isDragging = false
+      } else if (remainingTouches.length === 0) {
+        isDragging = false
+      }
+    }
+
+    // --- MANEJO DE EVENTOS TÁCTILES NATIVOS EN EL DOM (CAPTURE PHASE) ---
+    let hasTouchEvents = false
+
+    const onNativeTouchStart = (e) => {
+      hasTouchEvents = true
+      if (e.touches && e.touches.length >= 2) {
+        e.preventDefault()
+        e.stopPropagation()
+        startPinch(e.touches[0], e.touches[1])
+      }
+    }
+
+    const onNativeTouchMove = (e) => {
+      if (isPinching && e.touches && e.touches.length >= 2) {
+        e.preventDefault()
+        e.stopPropagation()
+        movePinch(e.touches[0], e.touches[1])
+      }
+    }
+
+    const onNativeTouchEnd = (e) => {
+      if (isPinching) {
+        if (!e.touches || e.touches.length < 2) {
+          e.preventDefault()
+          endPinch(e.touches ? Array.from(e.touches) : [])
+        }
+      }
+    }
+
+    // Soporte para punteros (PointerEvent) en dispositivos táctiles sin TouchEvent estándar
+    const activePointers = new Map()
+
+    const onPointerDown = (e) => {
+      if (hasTouchEvents || e.pointerType !== 'touch') return
+      activePointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY })
+      if (activePointers.size >= 2) {
+        e.preventDefault()
+        e.stopPropagation()
+        const [p0, p1] = Array.from(activePointers.values())
+        startPinch(p0, p1)
+      }
+    }
+
+    const onPointerMove = (e) => {
+      if (hasTouchEvents || e.pointerType !== 'touch') return
+      if (activePointers.has(e.pointerId)) {
+        activePointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY })
+      }
+      if (isPinching && activePointers.size >= 2) {
+        e.preventDefault()
+        e.stopPropagation()
+        const [p0, p1] = Array.from(activePointers.values())
+        movePinch(p0, p1)
+      }
+    }
+
+    const onPointerUp = (e) => {
+      if (hasTouchEvents || e.pointerType !== 'touch') return
+      activePointers.delete(e.pointerId)
+      if (isPinching && activePointers.size < 2) {
+        endPinch(Array.from(activePointers.values()))
+      }
+    }
+
+    this.container.addEventListener('touchstart', onNativeTouchStart, { passive: false, capture: true })
+    this.container.addEventListener('touchmove', onNativeTouchMove, { passive: false, capture: true })
+    this.container.addEventListener('touchend', onNativeTouchEnd, { passive: false, capture: true })
+    this.container.addEventListener('touchcancel', onNativeTouchEnd, { passive: false, capture: true })
+
+    this.container.addEventListener('pointerdown', onPointerDown, { passive: false, capture: true })
+    this.container.addEventListener('pointermove', onPointerMove, { passive: false, capture: true })
+    this.container.addEventListener('pointerup', onPointerUp, { passive: false, capture: true })
+    this.container.addEventListener('pointercancel', onPointerUp, { passive: false, capture: true })
+
+    this._touchCleanup = () => {
+      this.container.removeEventListener('touchstart', onNativeTouchStart, { capture: true })
+      this.container.removeEventListener('touchmove', onNativeTouchMove, { capture: true })
+      this.container.removeEventListener('touchend', onNativeTouchEnd, { capture: true })
+      this.container.removeEventListener('touchcancel', onNativeTouchEnd, { capture: true })
+      this.container.removeEventListener('pointerdown', onPointerDown, { capture: true })
+      this.container.removeEventListener('pointermove', onPointerMove, { capture: true })
+      this.container.removeEventListener('pointerup', onPointerUp, { capture: true })
+      this.container.removeEventListener('pointercancel', onPointerUp, { capture: true })
+    }
 
     canvas.on('mouse:wheel', (opt) => {
       const e = opt.e
@@ -358,18 +531,11 @@ export class CanvasManager {
       if (!e) return
 
       // Soporte para gesto táctil de dos dedos (pinch-to-zoom)
-      if (e.touches && e.touches.length === 2) {
-        isDragging = false
-        isPinching = true
-        const t0 = e.touches[0]
-        const t1 = e.touches[1]
-        startPinchDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY)
-        startPinchZoom = canvas.getZoom()
-        const rect = this.container.getBoundingClientRect()
-        pinchCenter = {
-          x: (t0.clientX + t1.clientX) / 2 - rect.left,
-          y: (t0.clientY + t1.clientY) / 2 - rect.top,
-        }
+      if (e.touches && e.touches.length >= 2) {
+        startPinch(e.touches[0], e.touches[1])
+        return
+      }
+      if (isPinching) {
         return
       }
 
@@ -405,16 +571,11 @@ export class CanvasManager {
       if (!e) return
 
       // Manejo de pellizco para zoom con dos dedos en pantallas táctiles
-      if (isPinching && e.touches && e.touches.length === 2) {
-        const t0 = e.touches[0]
-        const t1 = e.touches[1]
-        const currentDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY)
-        if (startPinchDist > 0 && currentDist > 0) {
-          let newZoom = startPinchZoom * (currentDist / startPinchDist)
-          if (newZoom > 20) newZoom = 20
-          if (newZoom < 0.02) newZoom = 0.02
-          canvas.zoomToPoint(pinchCenter, newZoom)
-        }
+      if (isPinching && e.touches && e.touches.length >= 2) {
+        movePinch(e.touches[0], e.touches[1])
+        return
+      }
+      if (isPinching) {
         return
       }
 
@@ -449,8 +610,9 @@ export class CanvasManager {
     canvas.on('mouse:up', (opt) => {
       if (isPinching) {
         if (!opt.e?.touches || opt.e.touches.length < 2) {
-          isPinching = false
+          endPinch(opt.e?.touches ? Array.from(opt.e.touches) : [])
         }
+        return
       }
 
       if (isDragging) {
@@ -895,6 +1057,14 @@ export class CanvasManager {
   }
 
   dispose() {
+    if (this._touchCleanup) {
+      this._touchCleanup()
+      this._touchCleanup = null
+    }
+    if (this._keyCleanup) {
+      this._keyCleanup()
+      this._keyCleanup = null
+    }
     if (this.resizeManager) {
       this.resizeManager.disconnect()
     }
