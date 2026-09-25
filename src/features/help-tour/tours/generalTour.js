@@ -46,13 +46,13 @@ export const generalTour = {
       id: 'tools-shapes',
       target: '[data-tour="tools-shapes"]',
       title: 'Figuras y líneas',
-      text: 'Este conjunto de herramientas incluye rectángulos, círculos, flechas, líneas y polígonos para agregar distintas figuras geométricas.',
+      text: 'Este conjunto de herramientas incluye rectángulos, círculos, flechas, marcadores, líneas y polígonos para agregar distintas figuras geométricas.',
       placement: 'top'
     },
     {
       id: 'tools-annotations',
       target: '[data-tour="tools-annotations"]',
-      title: 'Textos y marcadores',
+      title: 'Textos',
       text: 'Con estas herramientas podés escribir nombres o referencias sobre el mapa y colocar pines en puntos geográficos destacados.',
       placement: 'top'
     },
