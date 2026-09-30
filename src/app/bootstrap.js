@@ -14,6 +14,7 @@ import { configRepository } from '../core/repositories/ConfigRepository.js'
 import { mapRepository } from '../core/repositories/MapRepository.js'
 import { TourStorage } from '../features/help-tour/TourStorage.js'
 import { ExternalLinksPanel } from '../components/ExternalLinksPanel.js'
+import { trackMapSelect } from '../core/analytics/analytics.js'
 
 /**
  * Inicializa y configura todas las capas y componentes de la aplicación.
@@ -41,8 +42,6 @@ export async function bootstrap() {
   // Inicializar CanvasManager
   const canvasManager = new CanvasManager(editorContainer)
   canvasManager.init()
-
-
 
   // --- ESCUCHAR CAMBIOS EN EL ESTADO GLOBAL (REACTIVIDAD Y PERSISTENCIA) ---
   function saveDrawingState(immediate = false) {
@@ -121,9 +120,13 @@ export async function bootstrap() {
         await canvasManager.addLocalImage(file)
       } catch (err) {
         if (err.message === 'FILE_TOO_LARGE') {
-          alert('El archivo seleccionado supera el límite de 10 MB. Por favor, elige una imagen más liviana.')
+          alert(
+            'El archivo seleccionado supera el límite de 10 MB. Por favor, elige una imagen más liviana.'
+          )
         } else {
-          alert('No se pudo cargar la imagen. Es posible que el archivo esté dañado o tenga un formato no compatible.')
+          alert(
+            'No se pudo cargar la imagen. Es posible que el archivo esté dañado o tenga un formato no compatible.'
+          )
         }
       } finally {
         imageFileInput.value = ''
@@ -193,13 +196,12 @@ export async function bootstrap() {
       logoLink.href = uiConfig.logoLink
     }
 
-
-
     // 3. Ocultar / colapsar paneles por defecto si se inicia desde celular o pantalla chica
     const isSmallScreen =
       typeof window !== 'undefined' &&
       (window.innerWidth <= 768 ||
-        (typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 768px)').matches))
+        (typeof window.matchMedia === 'function' &&
+          window.matchMedia('(max-width: 768px)').matches))
 
     if (isSmallScreen) {
       if (sidebarContainer) {
@@ -217,7 +219,7 @@ export async function bootstrap() {
       id: 'links',
       label: 'Enlaces',
       title: 'Recursos del IGN',
-      icon: 'external-link'
+      icon: 'external-link',
     }
 
     const sidebar = new Sidebar(sidebarContainer, {
@@ -226,27 +228,27 @@ export async function bootstrap() {
           id: 'maps',
           label: 'Mapas',
           title: 'Elegí tu Mapa',
-          icon: 'public/icono-mapa-mapas-escolares-01.svg'
+          icon: 'public/icono-mapa-mapas-escolares-01.svg',
         },
         {
           id: 'accessibility',
           label: 'Accesibilidad',
           title: 'Accesibilidad',
-          icon: 'person-standing'
+          icon: 'person-standing',
         },
         {
           id: 'help',
           label: 'Ayuda',
           title: 'Ayuda',
-          icon: 'circle-question-mark'
+          icon: 'circle-question-mark',
         },
         {
           id: linksTabConfig.id || 'links',
           label: linksTabConfig.label || 'Enlaces',
           title: linksTabConfig.title || 'Recursos del IGN',
-          icon: linksTabConfig.icon || 'external-link'
-        }
-      ]
+          icon: linksTabConfig.icon || 'external-link',
+        },
+      ],
     })
     sidebar.mount()
 
@@ -297,16 +299,13 @@ export async function bootstrap() {
     let tourControllerInstance = null
     const getTour = async () => {
       if (!tourControllerInstance) {
-        const [
-          { TourController },
-          { generalTour }
-        ] = await Promise.all([
+        const [{ TourController }, { generalTour }] = await Promise.all([
           import('../features/help-tour/TourController.js'),
-          import('../features/help-tour/tours/generalTour.js')
+          import('../features/help-tour/tours/generalTour.js'),
         ])
         tourControllerInstance = {
           controller: new TourController({ canvasManager, sidebar, appStore }),
-          generalTour
+          generalTour,
         }
       }
       return tourControllerInstance
@@ -315,12 +314,9 @@ export async function bootstrap() {
     // Mostrar modal de bienvenida únicamente si el usuario no ha descartado el aviso
     let welcomeModal = null
     if (TourStorage.shouldShowAutoPrompt('general', 1)) {
-      const [
-        { TourWelcomeModal },
-        { generalTour }
-      ] = await Promise.all([
+      const [{ TourWelcomeModal }, { generalTour }] = await Promise.all([
         import('../features/help-tour/TourWelcomeModal.js'),
-        import('../features/help-tour/tours/generalTour.js')
+        import('../features/help-tour/tours/generalTour.js'),
       ])
 
       welcomeModal = new TourWelcomeModal(document.body, {
@@ -335,7 +331,7 @@ export async function bootstrap() {
           if (dontShowAgain) {
             TourStorage.setTourAutoPromptDismissed(generalTour.id, generalTour.version)
           }
-        }
+        },
       })
       welcomeModal.mount()
     }
@@ -347,7 +343,7 @@ export async function bootstrap() {
           const triggerEl = e && e.currentTarget ? e.currentTarget : null
           const { controller, generalTour } = await getTour()
           controller.start(generalTour, triggerEl)
-        }
+        },
       })
       helpPanel.mount()
     }
@@ -356,7 +352,7 @@ export async function bootstrap() {
     if (linksViewContainer) {
       const linksPanel = new ExternalLinksPanel(linksViewContainer, {
         intro: externalResourcesConfig?.intro,
-        resources: externalResourcesConfig?.items
+        resources: externalResourcesConfig?.items,
       })
       linksPanel.mount()
     }
@@ -434,6 +430,11 @@ export function createMapStateSubscriber({
     // 3. Cargar el mapa en el Canvas
     const mapData = await mapRepository.getById(newMapId)
     if (mapData && canvasManager) {
+      trackMapSelect({
+        mapName: mapData.name,
+        mapId: newMapId,
+      })
+
       if (loaderOverlay) {
         loaderOverlay.classList.remove('hidden')
       }
@@ -444,7 +445,8 @@ export function createMapStateSubscriber({
             ? mapData.imagePath
               ? `${(import.meta.env?.BASE_URL || '/').replace(/\/$/, '')}${mapData.imagePath}`
               : mapData.imageUrl
-            : mapData.imageUrl || `${(import.meta.env?.BASE_URL || '/').replace(/\/$/, '')}${mapData.imagePath}`
+            : mapData.imageUrl ||
+              `${(import.meta.env?.BASE_URL || '/').replace(/\/$/, '')}${mapData.imagePath}`
         await canvasManager.loadMap(mapUrl)
 
         // 4. Cargar dibujos guardados de la provincia activa (si existen)
