@@ -1,6 +1,7 @@
 import { appStore } from '../../state/AppStore.js'
 import { configRepository } from '../repositories/ConfigRepository.js'
 import { mapRepository } from '../repositories/MapRepository.js'
+import { trackMapDownload, trackMapPrint } from '../analytics/analytics.js'
 
 /**
  * Servicio encargado de la exportación de documentos (PNG, PDF) y de la impresión física.
@@ -93,6 +94,15 @@ export class ExportService {
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
+
+      const currentMapId = appStore.getState().activeMapId
+      const mapData = await mapRepository.getById(currentMapId)
+      trackMapDownload({
+        mapName: mapData ? mapData.name : fileName,
+        mapId: currentMapId,
+        format: 'png',
+        fileName: fileName,
+      })
     } catch (error) {
       console.error('ExportService: Error al exportar a PNG:', error)
     }
@@ -105,11 +115,7 @@ export class ExportService {
    * @returns {Promise<void>}
    */
   static async exportToImage(canvasManager, options = {}) {
-    const {
-      format = 'png',
-      scale = 100,
-      quality = 2,
-    } = options
+    const { format = 'png', scale = 100, quality = 2 } = options
 
     try {
       const currentMapId = appStore.getState().activeMapId
@@ -141,6 +147,13 @@ export class ExportService {
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
+
+      trackMapDownload({
+        mapName: mapData ? mapData.name : 'Desconocido',
+        mapId: currentMapId,
+        format: format,
+        fileName: fileName,
+      })
     } catch (error) {
       console.error('ExportService: Error al exportar a imagen:', error)
     }
@@ -196,12 +209,19 @@ export class ExportService {
       const offsetY = (paperHeight - finalH) / 2
 
       doc.addImage(dataUrl, 'PNG', offsetX, offsetY, finalW, finalH)
-      
+
       const prefix = configRepository.getExportFilenamePrefix()
       const mapName = mapData ? mapData.name.replace(/\s+/g, '_') : 'mapa'
       const fileName = `${prefix}${mapName}.pdf`
-      
+
       doc.save(fileName)
+
+      trackMapDownload({
+        mapName: mapData ? mapData.name : 'Desconocido',
+        mapId: currentMapId,
+        format: 'pdf',
+        fileName: fileName,
+      })
     } catch (error) {
       console.error('ExportService: Error al exportar a PDF:', error)
     }
@@ -214,16 +234,17 @@ export class ExportService {
    * @returns {Promise<void>}
    */
   static async print(canvasManager, options = {}) {
-    const {
-      paperWidth = 210,
-      paperHeight = 297,
-      scale = 100,
-    } = options
+    const { paperWidth = 210, paperHeight = 297, scale = 100 } = options
 
     try {
       const currentMapId = appStore.getState().activeMapId
       const mapData = await mapRepository.getById(currentMapId)
       const isPortrait = mapData ? mapData.isPortrait : true
+
+      trackMapPrint({
+        mapName: mapData ? mapData.name : 'Desconocido',
+        mapId: currentMapId,
+      })
 
       const mapWidthMm = isPortrait ? 190 : 240
       const mapHeightMm = isPortrait ? 240 : 190

@@ -48,10 +48,13 @@ export class TourWelcomeModal extends Component {
             <h2 id="tour-welcome-title" class="nbi-tour-welcome-title">¿Querés conocer las herramientas?</h2>
           </div>
           <p id="tour-welcome-desc" class="nbi-tour-welcome-desc">
-            Te invitamos a realizar un breve recorrido guiado para descubrir cómo explorar los mapas oficiales de Argentina y utilizar todas las herramientas de dibujo, figuras y anotación.
+            Te invitamos a realizar un breve recorrido guiado para descubrir cómo explorar los mapas escolares del IGN y utilizar todas las herramientas de dibujo, figuras y anotación.
           </p>
           <div class="nbi-tour-welcome-note">
             <span>Este recorrido es opcional. Siempre podrás iniciarlo o repetirlo desde la solapa <strong>Ayuda</strong> en el panel lateral.</span>
+            <span class="nbi-tour-welcome-consent">
+              Al utilizar esta aplicación, aceptás la recopilación anónima de estadísticas de uso y descarga para la mejora continua del servicio.
+            </span>
           </div>
           <label class="nbi-tour-welcome-checkbox-label" for="tour-welcome-dont-show">
             <input type="checkbox" id="tour-welcome-dont-show" />

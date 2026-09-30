@@ -26,10 +26,18 @@ vi.mock('../../repositories/ConfigRepository.js', () => ({
 const saveMock = vi.fn()
 const addImageMock = vi.fn()
 vi.mock('jspdf', () => ({
-  jsPDF: vi.fn().mockImplementation(function() {
+  jsPDF: vi.fn().mockImplementation(function () {
     this.save = saveMock
     this.addImage = addImageMock
   }),
+}))
+
+// Mock de Analytics
+const trackMapDownloadMock = vi.fn()
+const trackMapPrintMock = vi.fn()
+vi.mock('../../analytics/analytics.js', () => ({
+  trackMapDownload: (...args) => trackMapDownloadMock(...args),
+  trackMapPrint: (...args) => trackMapPrintMock(...args),
 }))
 
 describe('ExportService', () => {
@@ -108,6 +116,12 @@ describe('ExportService', () => {
     const link = appendSpy.mock.calls[0][0]
     expect(link.download).toBe('IGN_Escolar_Mapa_de_Salta.png')
     expect(link.href).toBe('data:image/png;base64,mocked-data')
+    expect(trackMapDownloadMock).toHaveBeenCalledWith({
+      mapName: 'Mapa de Salta',
+      mapId: 'mapa-1',
+      format: 'png',
+      fileName: 'IGN_Escolar_Mapa_de_Salta.png',
+    })
   })
 
   it('debería ejecutar exportToPDF, agregar la imagen escalada y guardar el PDF', async () => {
@@ -119,8 +133,21 @@ describe('ExportService', () => {
       quality: 2,
     })
 
-    expect(addImageMock).toHaveBeenCalledWith('data:image/png;base64,mocked-data', 'PNG', expect.any(Number), expect.any(Number), expect.any(Number), expect.any(Number))
+    expect(addImageMock).toHaveBeenCalledWith(
+      'data:image/png;base64,mocked-data',
+      'PNG',
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number)
+    )
     expect(saveMock).toHaveBeenCalledWith('IGN_Escolar_Mapa_de_Salta.pdf')
+    expect(trackMapDownloadMock).toHaveBeenCalledWith({
+      mapName: 'Mapa de Salta',
+      mapId: 'mapa-1',
+      format: 'pdf',
+      fileName: 'IGN_Escolar_Mapa_de_Salta.pdf',
+    })
   })
 
   it('debería ejecutar print creando un iframe invisible, escribiendo el documento y llamando a print', async () => {
@@ -151,6 +178,11 @@ describe('ExportService', () => {
       scale: 100,
     })
 
+    expect(trackMapPrintMock).toHaveBeenCalledWith({
+      mapName: 'Mapa de Salta',
+      mapId: 'mapa-1',
+    })
+
     expect(createElementSpy).toHaveBeenCalledWith('iframe')
     expect(mockIframe.style.position).toBe('fixed')
     expect(mockIframe.style.top).toBe('-9999px')
@@ -159,10 +191,10 @@ describe('ExportService', () => {
 
     // Simular el evento onafterprint para el cleanup
     expect(mockIframe.contentWindow.onafterprint).toBeTypeOf('function')
-    
+
     // Configurar parentNode mock para simular la existencia del iframe en el DOM
     mockIframe.parentNode = document.body
-    
+
     // Ejecutar cleanup y avanzar timers
     vi.useFakeTimers()
     mockIframe.contentWindow.onafterprint()

@@ -59,11 +59,20 @@ vi.mock('fabric', () => {
 
   class MockPencilBrush {}
 
+  class MockRect {
+    constructor(opts = {}) {
+      Object.assign(this, opts)
+      this.set = vi.fn((props) => Object.assign(this, props))
+      this.setCoords = vi.fn()
+    }
+  }
+
   return {
     Canvas: MockCanvas,
     FabricImage: MockFabricImage,
     PencilBrush: MockPencilBrush,
     FabricObject: MockFabricObject,
+    Rect: MockRect,
     util: {
       groupSVGElements: vi.fn(),
       enlivenObjects: vi.fn().mockResolvedValue([]),
@@ -181,6 +190,115 @@ describe('CanvasManager - Touch & Mobile Pan Handling', () => {
     expect(canvas.zoomToPoint).toHaveBeenCalled()
     const lastZoomCall = canvas.zoomToPoint.mock.calls[canvas.zoomToPoint.mock.calls.length - 1]
     expect(lastZoomCall[1]).toBeCloseTo(2, 1)
+  })
+
+  it('debería capturar el gesto nativo de pellizco en el DOM (touchstart con 2 dedos -> touchmove -> touchend)', () => {
+    const canvas = manager.canvas
+    canvas.getZoom = vi.fn().mockReturnValue(1)
+
+    // 1. Iniciar con dos dedos en la pantalla a 100px de distancia
+    const startEvent = new CustomEvent('touchstart', { bubbles: true, cancelable: true })
+    startEvent.touches = [
+      { clientX: 100, clientY: 200 },
+      { clientX: 200, clientY: 200 },
+    ]
+    container.dispatchEvent(startEvent)
+
+    // 2. Mover los dedos separándolos a 200px (zoom x2) y desplazando el centro
+    const moveEvent = new CustomEvent('touchmove', { bubbles: true, cancelable: true })
+    moveEvent.touches = [
+      { clientX: 50, clientY: 210 },
+      { clientX: 250, clientY: 210 },
+    ]
+    container.dispatchEvent(moveEvent)
+
+    expect(canvas.zoomToPoint).toHaveBeenCalled()
+    const lastZoomCall = canvas.zoomToPoint.mock.calls[canvas.zoomToPoint.mock.calls.length - 1]
+    expect(lastZoomCall[1]).toBeCloseTo(2, 1)
+    expect(canvas.requestRenderAll).toHaveBeenCalled()
+
+    // 3. Levantar los dedos
+    const endEvent = new CustomEvent('touchend', { bubbles: true, cancelable: true })
+    endEvent.touches = []
+    container.dispatchEvent(endEvent)
+  })
+
+  it('debería cancelar el trazado preliminar de una figura cuando apoya un segundo dedo para hacer zoom', () => {
+    manager.setTool('rect')
+    const rectTool = manager.toolService.activeTool
+
+    // 1. El primer dedo apoya y empieza a trazar un rectángulo
+    const pointerDownOpt = {
+      e: {
+        touches: [{ clientX: 100, clientY: 100 }],
+        clientX: 100,
+        clientY: 100,
+        button: 0,
+      },
+    }
+    rectTool.onMouseDown(pointerDownOpt)
+    expect(rectTool.isDrawing).toBe(true)
+    expect(rectTool.previewShape).not.toBeNull()
+
+    // 2. Apoya el segundo dedo (gesto de pellizco)
+    const pinchStartEvent = new CustomEvent('touchstart', { bubbles: true, cancelable: true })
+    pinchStartEvent.touches = [
+      { clientX: 100, clientY: 100 },
+      { clientX: 200, clientY: 100 },
+    ]
+    container.dispatchEvent(pinchStartEvent)
+
+    // El trazado preliminar debe haberse cancelado para no manchar el mapa
+    expect(rectTool.isDrawing).toBe(false)
+    expect(rectTool.previewShape).toBeNull()
+  })
+
+  it('debería soportar eventos PointerEvent de tipo touch en pantallas táctiles', () => {
+    const canvas = manager.canvas
+    canvas.getZoom = vi.fn().mockReturnValue(1)
+
+    // 1. Primer puntero táctil
+    const p1Down = new CustomEvent('pointerdown', { bubbles: true, cancelable: true })
+    p1Down.pointerId = 1
+    p1Down.pointerType = 'touch'
+    p1Down.clientX = 100
+    p1Down.clientY = 200
+    container.dispatchEvent(p1Down)
+
+    // 2. Segundo puntero táctil a 100px de distancia
+    const p2Down = new CustomEvent('pointerdown', { bubbles: true, cancelable: true })
+    p2Down.pointerId = 2
+    p2Down.pointerType = 'touch'
+    p2Down.clientX = 200
+    p2Down.clientY = 200
+    container.dispatchEvent(p2Down)
+
+    // 3. Mover el segundo puntero a 300px (distancia de 200px -> zoom x2)
+    const p2Move = new CustomEvent('pointermove', { bubbles: true, cancelable: true })
+    p2Move.pointerId = 2
+    p2Move.pointerType = 'touch'
+    p2Move.clientX = 300
+    p2Move.clientY = 200
+    container.dispatchEvent(p2Move)
+
+    expect(canvas.zoomToPoint).toHaveBeenCalled()
+    const lastZoomCall = canvas.zoomToPoint.mock.calls[canvas.zoomToPoint.mock.calls.length - 1]
+    expect(lastZoomCall[1]).toBeCloseTo(2, 1)
+
+    // 4. Levantar puntero
+    const p2Up = new CustomEvent('pointerup', { bubbles: true, cancelable: true })
+    p2Up.pointerId = 2
+    p2Up.pointerType = 'touch'
+    container.dispatchEvent(p2Up)
+  })
+
+  it('debería desvincular los listeners táctiles al invocar dispose()', () => {
+    expect(typeof manager._touchCleanup).toBe('function')
+    const cleanupSpy = vi.spyOn(manager, '_touchCleanup')
+
+    manager.dispose()
+    expect(cleanupSpy).toHaveBeenCalled()
+    expect(manager._touchCleanup).toBeNull()
   })
 })
 

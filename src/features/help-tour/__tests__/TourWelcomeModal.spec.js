@@ -32,6 +32,7 @@ describe('TourWelcomeModal', () => {
     expect(container.querySelector('#tour-welcome-dont-show')).not.toBeNull()
     expect(container.querySelector('#tour-welcome-start')).not.toBeNull()
     expect(container.querySelector('#tour-welcome-dismiss')).not.toBeNull()
+    expect(container.querySelector('.nbi-tour-welcome-note').textContent).toContain('Google Analytics')
 
     modal.destroy()
   })
