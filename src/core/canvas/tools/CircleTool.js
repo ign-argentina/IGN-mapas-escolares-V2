@@ -13,10 +13,19 @@ export class CircleTool extends BaseTool {
     this.previewShape = null
   }
 
-  onActivate() {
-    this.canvasManager.adapter.setDrawingMode(false)
-    this.canvasManager.adapter.setSelectionEnabled(false)
-    this.canvasManager.adapter.setDefaultCursor('crosshair')
+  onActivate() {}
+
+  onDeactivate() {
+    this.cleanup()
+  }
+
+  cleanup() {
+    if (this.previewShape) {
+      this.canvasManager.adapter.removeObject(this.previewShape)
+      this.previewShape = null
+      this.canvasManager.adapter.requestRenderAll()
+    }
+    this.isDrawing = false
   }
 
   onMouseDown(opt) {
@@ -53,6 +62,9 @@ export class CircleTool extends BaseTool {
     const top = Math.min(this.startY, currentY)
 
     this.previewShape.set({ left, top, radius })
+    if (typeof this.previewShape.setCoords === 'function') {
+      this.previewShape.setCoords()
+    }
     this.canvasManager.adapter.requestRenderAll()
   }
 
@@ -67,7 +79,7 @@ export class CircleTool extends BaseTool {
       this.previewShape.set({
         left: this.startX,
         top: this.startY,
-        radius: 60,
+        radius: 150,
         originX: 'center',
         originY: 'center',
       })
@@ -76,6 +88,10 @@ export class CircleTool extends BaseTool {
         originX: 'left',
         originY: 'top',
       })
+    }
+
+    if (typeof this.previewShape.setCoords === 'function') {
+      this.previewShape.setCoords()
     }
 
     this.canvasManager.finishCreatedObject(this.previewShape, 'circle')

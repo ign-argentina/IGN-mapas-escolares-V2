@@ -1,4 +1,5 @@
 @import './settings/tokens.css';
+@import './generic/fonts.css';
 @import './generic/reset.css';
 @import './elements/base.css';
 @import './layout/app-layout.css';
@@ -15,6 +16,11 @@
 @import './components/loader.css';
 @import './components/external-link.css';
 @import './components/zoom-controls.css';
+@import './components/accessibility-panel.css';
+@import './components/help-panel.css';
+@import './components/tour-overlay.css';
+@import './components/tour-welcome-modal.css';
+@import './components/external-links-panel.css';
 @import './themes/accessibility.css';
 @import './utilities/helpers.css';
 
@@ -28,4 +34,4 @@
 
 
 
-
+

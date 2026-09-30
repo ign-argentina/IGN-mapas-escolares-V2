@@ -5,8 +5,17 @@ import { BaseTool } from './BaseTool.js'
  */
 export class SelectTool extends BaseTool {
   onActivate() {
-    this.canvasManager.adapter.setDrawingMode(false)
-    this.canvasManager.adapter.setSelectionEnabled(true)
-    this.canvasManager.adapter.setDefaultCursor('default')
+    if (!this.canvasManager?.adapter) return
+    if (typeof this.canvasManager.adapter.getObjects === 'function') {
+      const objects = this.canvasManager.adapter.getObjects()
+      if (Array.isArray(objects)) {
+        objects.forEach((obj) => {
+          if (typeof obj.setCoords === 'function') {
+            obj.setCoords()
+          }
+        })
+      }
+    }
+    this.canvasManager.adapter.requestRenderAll()
   }
 }

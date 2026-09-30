@@ -1,8 +1,6 @@
-import { jsPDF } from 'jspdf'
 import { Component } from '../Component.js'
 import { appStore } from '../../state/AppStore.js'
 import { ExportService } from '../../core/export/ExportService.js'
-import { configRepository } from '../../core/repositories/ConfigRepository.js'
 
 /**
  * Componente que gestiona el cuadro de diálogo de exportación de mapas (Formatos, Calidad, Previsualización, PDF e Impresión).
@@ -48,6 +46,9 @@ export class ExportModal extends Component {
     this.closeBtn = document.getElementById('export-modal-close')
     this.cancelBtn = document.getElementById('exp-btn-cancel')
     this.submitBtn = document.getElementById('exp-btn-submit')
+    this.printWarning = document.getElementById('exp-print-warning')
+    this.warnOrient = document.getElementById('exp-warn-orient')
+    this.warnPaper = document.getElementById('exp-warn-paper')
   }
 
   bindEvents() {
@@ -90,6 +91,7 @@ export class ExportModal extends Component {
     if (paperSelect) {
       this.addEvent(paperSelect, 'change', async (e) => {
         this.paperSizeKey = e.target.value
+        this.updatePrintWarning()
         await this.updatePreview()
       })
     }
@@ -145,6 +147,18 @@ export class ExportModal extends Component {
     }
   }
 
+  updatePrintWarning() {
+    if (this.warnOrient) {
+      this.warnOrient.textContent = this.orientation === 'portrait' ? 'Vertical' : 'Horizontal'
+    }
+    if (this.warnPaper) {
+      this.warnPaper.textContent = this.paperSizeKey === 'A4' ? 'A4' : 'Oficio / Legal'
+    }
+    if (window.lucide) {
+      window.lucide.createIcons()
+    }
+  }
+
   setDestination(dest) {
     this.destination = dest
 
@@ -165,6 +179,8 @@ export class ExportModal extends Component {
       } else {
         qualitySection?.classList.add('hidden')
       }
+
+      this.printWarning?.classList.add('hidden')
     } else {
       destPrintBtn?.classList.add('is-active')
       destPrintBtn?.setAttribute('aria-pressed', 'true')
@@ -173,6 +189,9 @@ export class ExportModal extends Component {
 
       formatSection?.classList.add('hidden')
       qualitySection?.classList.add('hidden')
+
+      this.printWarning?.classList.remove('hidden')
+      this.updatePrintWarning()
     }
 
     this.updateSubmitButtonUI()
@@ -218,6 +237,7 @@ export class ExportModal extends Component {
       portraitBtn?.setAttribute('aria-pressed', 'false')
     }
 
+    this.updatePrintWarning()
     await this.updatePreview()
   }
 
@@ -367,151 +387,24 @@ export class ExportModal extends Component {
     imgEl.style.transform = 'none'
   }
 
-  async getMapName() {
-    const currentMapId = appStore.getState().activeMapId
-    const mapData = await this.mapRepository.getById(currentMapId)
-    return mapData ? mapData.name.replace(/\s+/g, '_') : 'mapa'
-  }
-
   async executeAction() {
+    const paper = this.getPaperDimensions()
+    const options = {
+      format: this.format,
+      scale: this.scale,
+      quality: this.quality,
+      orientation: this.orientation,
+      paperWidth: paper.width,
+      paperHeight: paper.height,
+    }
+
     if (this.destination === 'print') {
-      await this.executePrint()
+      await ExportService.print(this.canvasManager, options)
     } else if (this.format === 'pdf') {
-      await this.executePDFExport()
+      await ExportService.exportToPDF(this.canvasManager, options)
     } else {
-      await this.executeImageExport()
+      await ExportService.exportToImage(this.canvasManager, options)
     }
     this.close()
-  }
-
-  async executeImageExport() {
-    const currentMapId = appStore.getState().activeMapId
-    const mapData = await this.mapRepository.getById(currentMapId)
-    const isPortrait = mapData ? mapData.isPortrait : true
-
-    const mapWidthMm = isPortrait ? 190 : 240
-    const mapHeightMm = isPortrait ? 240 : 190
-
-    const DPI = this.quality === 1 ? 72 : this.quality === 3 ? 300 : 150
-    const mmToInches = 1 / 25.4
-    const targetWidthPx = Math.round(mapWidthMm * mmToInches * DPI * (this.scale / 100))
-    const targetHeightPx = Math.round(mapHeightMm * mmToInches * DPI * (this.scale / 100))
-
-    const dataUrl = await ExportService.getExportDataURL(this.canvasManager, {
-      format: this.format,
-      quality: 0.95,
-      targetWidth: targetWidthPx,
-      targetHeight: targetHeightPx,
-    })
-
-    const prefix = configRepository.getExportFilenamePrefix()
-    const mapName = await this.getMapName()
-    const fileName = `${prefix}${mapName}.${this.format}`
-    const link = document.createElement('a')
-    link.download = fileName
-    link.href = dataUrl
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-  }
-
-  async executePDFExport() {
-    const paper = this.getPaperDimensions()
-    const doc = new jsPDF({
-      orientation: this.orientation,
-      unit: 'mm',
-      format: [paper.width, paper.height],
-    })
-
-    const currentMapId = appStore.getState().activeMapId
-    const mapData = await this.mapRepository.getById(currentMapId)
-    const isPortrait = mapData ? mapData.isPortrait : true
-
-    const mapWidthMm = isPortrait ? 190 : 240
-    const mapHeightMm = isPortrait ? 240 : 190
-
-    const DPI = this.quality === 1 ? 72 : this.quality === 3 ? 300 : 150
-    const mmToInches = 1 / 25.4
-    const targetWidthPx = Math.round(mapWidthMm * mmToInches * DPI)
-    const targetHeightPx = Math.round(mapHeightMm * mmToInches * DPI)
-
-    const dataUrl = await ExportService.getExportDataURL(this.canvasManager, {
-      format: 'png',
-      quality: 1.0,
-      targetWidth: targetWidthPx,
-      targetHeight: targetHeightPx,
-    })
-
-    const scaleFactor = this.scale / 100
-    const finalW = mapWidthMm * scaleFactor
-    const finalH = mapHeightMm * scaleFactor
-
-    const offsetX = (paper.width - finalW) / 2
-    const offsetY = (paper.height - finalH) / 2
-
-    doc.addImage(dataUrl, 'PNG', offsetX, offsetY, finalW, finalH)
-    const prefix = configRepository.getExportFilenamePrefix()
-    const mapName = await this.getMapName()
-    doc.save(`${prefix}${mapName}.pdf`)
-  }
-
-  async executePrint() {
-    const paper = this.getPaperDimensions()
-
-    const currentMapId = appStore.getState().activeMapId
-    const mapData = await this.mapRepository.getById(currentMapId)
-    const isPortrait = mapData ? mapData.isPortrait : true
-
-    const mapWidthMm = isPortrait ? 190 : 240
-    const mapHeightMm = isPortrait ? 240 : 190
-
-    const DPI = 150
-    const mmToInches = 1 / 25.4
-    const targetWidthPx = Math.round(mapWidthMm * mmToInches * DPI)
-    const targetHeightPx = Math.round(mapHeightMm * mmToInches * DPI)
-
-    const dataUrl = await ExportService.getExportDataURL(this.canvasManager, {
-      format: 'png',
-      quality: 1.0,
-      targetWidth: targetWidthPx,
-      targetHeight: targetHeightPx,
-    })
-
-    const scaleFactor = this.scale / 100
-    const finalW = mapWidthMm * scaleFactor
-    const finalH = mapHeightMm * scaleFactor
-
-    const offsetX = (paper.width - finalW) / 2
-    const offsetY = (paper.height - finalH) / 2
-
-    // Inyectar regla @page dinámica con tamaño y orientación de hoja exactos y margen 0
-    const printStyle = document.createElement('style')
-    printStyle.id = 'nbi-print-page-style'
-    printStyle.innerHTML = `
-      @page {
-        size: ${paper.width}mm ${paper.height}mm;
-        margin: 0;
-      }
-    `
-    document.head.appendChild(printStyle)
-
-    const printSection = document.createElement('div')
-    printSection.id = 'nbi-print-section'
-
-    printSection.innerHTML = `
-      <div style="width: ${paper.width}mm; height: ${paper.height}mm; position: relative; background: #fff; overflow: hidden;">
-        <img src="${dataUrl}" style="position: absolute; left: ${offsetX}mm; top: ${offsetY}mm; width: ${finalW}mm; height: ${finalH}mm; object-fit: contain;" alt="Mapa impreso" />
-      </div>
-    `
-
-    document.body.appendChild(printSection)
-
-    setTimeout(() => {
-      window.print()
-      setTimeout(() => {
-        document.body.removeChild(printSection)
-        document.head.removeChild(printStyle) // Limpieza del estilo dinámico
-      }, 500)
-    }, 200)
   }
 }

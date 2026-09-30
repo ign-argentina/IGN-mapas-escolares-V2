@@ -1,17 +1,12 @@
 import { FabricImage } from 'fabric'
 import { FabricAdapter } from './canvas/FabricAdapter.js'
 import { ShapeFactory } from './canvas/ShapeFactory.js'
-import { ExportService } from './export/ExportService.js'
 import { ToolService } from './canvas/tools/ToolService.js'
 
-import { CommandHistory } from './canvas/commands/CommandHistory.js'
-import { DeleteCommand } from './canvas/commands/DeleteCommand.js'
-import { DuplicateCommand } from './canvas/commands/DuplicateCommand.js'
-import { BringToFrontCommand } from './canvas/commands/BringToFrontCommand.js'
-import { SendToBackCommand } from './canvas/commands/SendToBackCommand.js'
-import { ClearCommand } from './canvas/commands/ClearCommand.js'
 import { ResizeManager } from './utils/ResizeManager.js'
 import { compressImage } from './utils/imageCompressor.js'
+import { HistoryManager } from './canvas/history/HistoryManager.js'
+import { Memento } from './canvas/history/Memento.js'
 
 export class CanvasManager {
   constructor(container, options = {}) {
@@ -25,7 +20,8 @@ export class CanvasManager {
     this.canvas = null
     this.canvasEl = null
     this.resizeManager = null
-    this.commandHistory = new CommandHistory()
+    this.historyManager = new HistoryManager(this)
+    this.isRestoringHistory = false
 
     // Dimensiones en caché para evitar bucles de redimensionamiento
     this.canvasWidth = 0
@@ -36,9 +32,9 @@ export class CanvasManager {
     this.currentMapUrl = null
 
     // Propiedades de herramientas NBI
-    this.activeColor = '#FFF4B0'
-    this.activeStrokeWidth = 8
-    this.activeTool = 'select'
+    this.activeColor = '#000000'
+    this.activeStrokeWidth = 12
+    this.activeTool = 'pan'
     this.onToolChange = null
 
     // Estado de dibujo interactivo de figuras
@@ -65,6 +61,18 @@ export class CanvasManager {
     this.toolService = new ToolService(this)
     this.toolService.setTool(this.activeTool)
 
+    // Configurar listeners de eventos para el historial
+    this.canvas.on('object:modified', () => {
+      if (!this.isRestoringHistory) {
+        this.historyManager.capture()
+      }
+    })
+    this.canvas.on('path:created', () => {
+      if (!this.isRestoringHistory) {
+        this.historyManager.capture()
+      }
+    })
+
     this.configureDrawingBrush()
     this.observeZoomAndPan()
     this.observeResize()
@@ -81,11 +89,34 @@ export class CanvasManager {
       'Lienzo interactivo de dibujo sobre el mapa. Presioná Delete o Supr para borrar figuras seleccionadas o Escape para deseleccionar.'
     )
 
-    // Escuchador de eventos de teclado en el canvas para accesibilidad
-    this.canvasEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        const activeObj = this.canvas?.getActiveObject()
-        if (activeObj && !(activeObj.type === 'textbox' && activeObj.isEditing)) {
+    // Escuchador de eventos de teclado en el canvas para accesibilidad y atajos
+    this.canvasEl.addEventListener('keydown', (e) => this.handleKeyDown(e))
+
+    this.container.appendChild(this.canvasEl)
+  }
+
+  handleKeyDown(e) {
+    const activeElement = document.activeElement
+    const isInputFocused =
+      activeElement &&
+      (activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.isContentEditable)
+
+    const activeObject = this.canvas?.getActiveObject()
+    const isEditingText = activeObject && activeObject.type === 'textbox' && activeObject.isEditing
+
+    if (this.toolService && this.toolService.activeTool && typeof this.toolService.activeTool.onKeyDown === 'function') {
+      const handled = this.toolService.activeTool.onKeyDown(e)
+      if (handled) {
+        e.preventDefault()
+        return
+      }
+    }
+
+    if (!isInputFocused && !isEditingText) {
+      if (e.key === 'Delete' || e.key === 'Backspace' || e.key === 'Del') {
+        if (activeObject && activeObject !== this.currentMapImage) {
           e.preventDefault()
           this.deleteSelected()
         }
@@ -96,9 +127,7 @@ export class CanvasManager {
           this.announceA11y('Selección cancelada')
         }
       }
-    })
-
-    this.container.appendChild(this.canvasEl)
+    }
   }
 
   configureDrawingBrush() {
@@ -114,16 +143,46 @@ export class CanvasManager {
 
     if (!width || !height) return
 
-    if (this.canvasWidth !== width || this.canvasHeight !== height) {
+    const oldWidth = this.canvasWidth
+    const oldHeight = this.canvasHeight
+
+    if (oldWidth !== width || oldHeight !== height) {
       this.canvasWidth = width
       this.canvasHeight = height
 
       this.adapter.setDimensions({ width, height })
       this.adapter.calcOffset()
-      this.adapter.requestRenderAll()
 
       if (this.currentMapImage) {
-        this.fitMapToCanvas()
+        const imgWidth = this.currentMapImage.width
+        const imgHeight = this.currentMapImage.height
+
+        if (!oldWidth || !oldHeight || !imgWidth || !imgHeight) {
+          this.fitMapToCanvas()
+        } else {
+          const oldFitScale = Math.min((oldWidth * 0.9) / imgWidth, (oldHeight * 0.9) / imgHeight)
+          const newFitScale = Math.min((width * 0.9) / imgWidth, (height * 0.9) / imgHeight)
+          const oldVpt = this.adapter.getViewportTransform()
+          const currentZoom = oldVpt ? oldVpt[0] : oldFitScale
+
+          // Si el zoom estaba en el ajuste predeterminado, recalcular fitMapToCanvas directamente
+          const isAtDefaultFit = Math.abs(currentZoom - oldFitScale) < 0.005
+
+          if (isAtDefaultFit || oldFitScale <= 0) {
+            this.fitMapToCanvas()
+          } else {
+            const zoomRatio = newFitScale / oldFitScale
+            const centerMapX = (oldWidth / 2 - (oldVpt ? oldVpt[4] : 0)) / currentZoom
+            const centerMapY = (oldHeight / 2 - (oldVpt ? oldVpt[5] : 0)) / currentZoom
+            const newZoom = currentZoom * zoomRatio
+            const newTx = width / 2 - centerMapX * newZoom
+            const newTy = height / 2 - centerMapY * newZoom
+            this.adapter.setViewportTransform([newZoom, 0, 0, newZoom, newTx, newTy])
+            this.adapter.requestRenderAll()
+          }
+        }
+      } else {
+        this.adapter.requestRenderAll()
       }
     }
   }
@@ -163,33 +222,29 @@ export class CanvasManager {
     const imgWidth = this.currentMapImage.width
     const imgHeight = this.currentMapImage.height
 
-    if (!imgWidth || !imgHeight) return
+    if (!imgWidth || !imgHeight || !canvasWidth || !canvasHeight) return
 
-    const canvasRatio = canvasWidth / canvasHeight
-    const imgRatio = imgWidth / imgHeight
-
-    let scale = 1
-    if (imgRatio > canvasRatio) {
-      scale = canvasWidth / imgWidth
-    } else {
-      scale = canvasHeight / imgHeight
-    }
-
-    const left = (canvasWidth - imgWidth * scale) / 2
-    const top = (canvasHeight - imgHeight * scale) / 2
-
+    // Mantener la imagen del mapa base en origen canónico (0,0) y escala 1.0 fija
     this.currentMapImage.set({
-      scaleX: scale,
-      scaleY: scale,
-      left: left,
-      top: top,
+      left: 0,
+      top: 0,
+      scaleX: 1,
+      scaleY: 1,
+      originX: 'left',
+      originY: 'top',
     })
 
-    const zoom = 0.8
-    const xOffset = (canvasWidth - canvasWidth * zoom) / 2
-    const yOffset = (canvasHeight - canvasHeight * zoom) / 2
+    // Calcular escala de ajuste con un margen visual (90%) para encajar proporcionalmente
+    const paddingFactor = 0.9
+    const scaleX = (canvasWidth * paddingFactor) / imgWidth
+    const scaleY = (canvasHeight * paddingFactor) / imgHeight
+    const scale = Math.min(scaleX, scaleY)
 
-    this.adapter.setViewportTransform([zoom, 0, 0, zoom, xOffset, yOffset])
+    // Centrar la escena canónica en el contenedor visible
+    const xOffset = (canvasWidth - imgWidth * scale) / 2
+    const yOffset = (canvasHeight - imgHeight * scale) / 2
+
+    this.adapter.setViewportTransform([scale, 0, 0, scale, xOffset, yOffset])
     this.adapter.requestRenderAll()
   }
 
@@ -201,25 +256,23 @@ export class CanvasManager {
     let lastPosX = 0
     let lastPosY = 0
     let isSpacePressed = false
+    const handleKeyDown = (e) => {
+      const activeElement = document.activeElement
+      const isInputFocused = activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.isContentEditable
+      )
 
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Space') {
+      const activeObject = this.canvas?.getActiveObject()
+      const isEditingText = activeObject && activeObject.type === 'textbox' && activeObject.isEditing
+
+      if (e.code === 'Space' && !isInputFocused && !isEditingText) {
         isSpacePressed = true
         canvas.defaultCursor = 'grab'
         canvas.setCursor('grab')
         canvas.selection = false
       }
-
-      // Atajos de teclado para Deshacer/Rehacer (Ctrl+Z y Ctrl+Y o Ctrl+Shift+Z)
-      const activeElement = document.activeElement
-      const isInputFocused = activeElement && (
-        activeElement.tagName === 'INPUT' || 
-        activeElement.tagName === 'TEXTAREA' || 
-        activeElement.isContentEditable
-      )
-      
-      const activeObject = this.canvas?.getActiveObject()
-      const isEditingText = activeObject && activeObject.type === 'textbox' && activeObject.isEditing
 
       if (!isInputFocused && !isEditingText) {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
@@ -232,35 +285,242 @@ export class CanvasManager {
         } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
           e.preventDefault()
           this.redo()
+        } else {
+          this.handleKeyDown(e)
         }
       }
-    })
+    }
 
-    window.addEventListener('keyup', (e) => {
+    const handleKeyUp = (e) => {
       if (e.code === 'Space') {
         isSpacePressed = false
-        if (this.activeTool === 'select') {
+        if (this.activeTool === 'pan') {
+          canvas.defaultCursor = 'grab'
+          canvas.setCursor('grab')
+          canvas.selection = false
+        } else if (this.activeTool === 'select') {
           canvas.defaultCursor = 'default'
           canvas.setCursor('default')
           canvas.selection = true
-        } else if (['rect', 'circle', 'arrow', 'text', 'pin'].includes(this.activeTool)) {
+        } else if (['rect', 'circle', 'arrow', 'polyline', 'polygon', 'text', 'pin'].includes(this.activeTool)) {
           canvas.defaultCursor = 'crosshair'
           canvas.setCursor('crosshair')
           canvas.selection = false
         }
       }
-    })
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    this._keyCleanup = () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
+
+    /**
+     * Extrae de forma segura las coordenadas de pantalla de un evento (Mouse, Pointer o Touch)
+     * @param {Event} e
+     * @returns {{x: number, y: number}|null}
+     */
+    const getPointerClientCoords = (e) => {
+      if (!e) return null
+      if (e.touches && e.touches.length > 0) {
+        return { x: e.touches[0].clientX, y: e.touches[0].clientY }
+      }
+      if (e.changedTouches && e.changedTouches.length > 0) {
+        return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY }
+      }
+      if (typeof e.clientX === 'number' && typeof e.clientY === 'number') {
+        return { x: e.clientX, y: e.clientY }
+      }
+      return null
+    }
+
+    let isPinching = false
+    let lastPinchDist = 0
+    let lastPinchCenter = { x: 0, y: 0 }
+
+    const getTargetRect = () => {
+      const el = this.canvas?.upperCanvasEl || this.canvasEl || this.container
+      return el.getBoundingClientRect()
+    }
+
+    const startPinch = (t0, t1) => {
+      isDragging = false
+      isPinching = true
+      lastPinchDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY)
+      const rect = getTargetRect()
+      lastPinchCenter = {
+        x: (t0.clientX + t1.clientX) / 2 - rect.left,
+        y: (t0.clientY + t1.clientY) / 2 - rect.top,
+      }
+
+      // Limpiar figuras temporales de un solo dedo si se estaba trazando (rect, circle, arrow)
+      const tool = this.toolService?.activeTool
+      if (tool && tool.isDrawing && typeof tool.cleanup === 'function') {
+        tool.cleanup()
+      }
+
+      // Si el pincel libre estaba dibujando, cancelar el trazo en curso
+      if (canvas.isDrawingMode) {
+        canvas._isCurrentlyDrawing = false
+        if (canvas.freeDrawingBrush && canvas.freeDrawingBrush._points) {
+          canvas.freeDrawingBrush._points = []
+        }
+        canvas.requestRenderAll()
+      }
+    }
+
+    const movePinch = (t0, t1) => {
+      if (!isPinching) return
+      const currentDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY)
+      const rect = getTargetRect()
+      const currentCenter = {
+        x: (t0.clientX + t1.clientX) / 2 - rect.left,
+        y: (t0.clientY + t1.clientY) / 2 - rect.top,
+      }
+
+      if (lastPinchDist > 0 && currentDist > 0) {
+        const scaleDelta = currentDist / lastPinchDist
+        let currentZoom = canvas.getZoom()
+        let newZoom = currentZoom * scaleDelta
+        if (newZoom > 20) newZoom = 20
+        if (newZoom < 0.02) newZoom = 0.02
+
+        // 1. Zoom con respecto al centro anterior
+        canvas.zoomToPoint(lastPinchCenter, newZoom)
+
+        // 2. Desplazamiento por el movimiento del centro (paneo con dos dedos)
+        const dx = currentCenter.x - lastPinchCenter.x
+        const dy = currentCenter.y - lastPinchCenter.y
+        if (dx !== 0 || dy !== 0) {
+          const vpt = canvas.viewportTransform
+          if (Array.isArray(vpt) && vpt.length >= 6) {
+            vpt[4] += dx
+            vpt[5] += dy
+            if (typeof canvas.setViewportTransform === 'function') {
+              canvas.setViewportTransform(vpt)
+            }
+          }
+        }
+        canvas.requestRenderAll()
+      }
+
+      lastPinchDist = currentDist
+      lastPinchCenter = currentCenter
+    }
+
+    const endPinch = (remainingTouches = []) => {
+      isPinching = false
+      lastPinchDist = 0
+      if (remainingTouches.length === 1) {
+        lastPosX = remainingTouches[0].clientX
+        lastPosY = remainingTouches[0].clientY
+        isDragging = false
+      } else if (remainingTouches.length === 0) {
+        isDragging = false
+      }
+    }
+
+    // --- MANEJO DE EVENTOS TÁCTILES NATIVOS EN EL DOM (CAPTURE PHASE) ---
+    let hasTouchEvents = false
+
+    const onNativeTouchStart = (e) => {
+      hasTouchEvents = true
+      if (e.touches && e.touches.length >= 2) {
+        e.preventDefault()
+        e.stopPropagation()
+        startPinch(e.touches[0], e.touches[1])
+      }
+    }
+
+    const onNativeTouchMove = (e) => {
+      if (isPinching && e.touches && e.touches.length >= 2) {
+        e.preventDefault()
+        e.stopPropagation()
+        movePinch(e.touches[0], e.touches[1])
+      }
+    }
+
+    const onNativeTouchEnd = (e) => {
+      if (isPinching) {
+        if (!e.touches || e.touches.length < 2) {
+          e.preventDefault()
+          endPinch(e.touches ? Array.from(e.touches) : [])
+        }
+      }
+    }
+
+    // Soporte para punteros (PointerEvent) en dispositivos táctiles sin TouchEvent estándar
+    const activePointers = new Map()
+
+    const onPointerDown = (e) => {
+      if (hasTouchEvents || e.pointerType !== 'touch') return
+      activePointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY })
+      if (activePointers.size >= 2) {
+        e.preventDefault()
+        e.stopPropagation()
+        const [p0, p1] = Array.from(activePointers.values())
+        startPinch(p0, p1)
+      }
+    }
+
+    const onPointerMove = (e) => {
+      if (hasTouchEvents || e.pointerType !== 'touch') return
+      if (activePointers.has(e.pointerId)) {
+        activePointers.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY })
+      }
+      if (isPinching && activePointers.size >= 2) {
+        e.preventDefault()
+        e.stopPropagation()
+        const [p0, p1] = Array.from(activePointers.values())
+        movePinch(p0, p1)
+      }
+    }
+
+    const onPointerUp = (e) => {
+      if (hasTouchEvents || e.pointerType !== 'touch') return
+      activePointers.delete(e.pointerId)
+      if (isPinching && activePointers.size < 2) {
+        endPinch(Array.from(activePointers.values()))
+      }
+    }
+
+    this.container.addEventListener('touchstart', onNativeTouchStart, { passive: false, capture: true })
+    this.container.addEventListener('touchmove', onNativeTouchMove, { passive: false, capture: true })
+    this.container.addEventListener('touchend', onNativeTouchEnd, { passive: false, capture: true })
+    this.container.addEventListener('touchcancel', onNativeTouchEnd, { passive: false, capture: true })
+
+    this.container.addEventListener('pointerdown', onPointerDown, { passive: false, capture: true })
+    this.container.addEventListener('pointermove', onPointerMove, { passive: false, capture: true })
+    this.container.addEventListener('pointerup', onPointerUp, { passive: false, capture: true })
+    this.container.addEventListener('pointercancel', onPointerUp, { passive: false, capture: true })
+
+    this._touchCleanup = () => {
+      this.container.removeEventListener('touchstart', onNativeTouchStart, { capture: true })
+      this.container.removeEventListener('touchmove', onNativeTouchMove, { capture: true })
+      this.container.removeEventListener('touchend', onNativeTouchEnd, { capture: true })
+      this.container.removeEventListener('touchcancel', onNativeTouchEnd, { capture: true })
+      this.container.removeEventListener('pointerdown', onPointerDown, { capture: true })
+      this.container.removeEventListener('pointermove', onPointerMove, { capture: true })
+      this.container.removeEventListener('pointerup', onPointerUp, { capture: true })
+      this.container.removeEventListener('pointercancel', onPointerUp, { capture: true })
+    }
 
     canvas.on('mouse:wheel', (opt) => {
-      const delta = opt.e.deltaY
+      const e = opt.e
+      const delta = e.deltaY || 0
       let zoom = canvas.getZoom()
 
       zoom *= 0.999 ** delta
 
-      if (zoom > 8) zoom = 8
-      if (zoom < 0.5) zoom = 0.5
+      if (zoom > 20) zoom = 20
+      if (zoom < 0.02) zoom = 0.02
 
-      canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom)
+      const offsetX = typeof e.offsetX === 'number' ? e.offsetX : this.canvasWidth / 2
+      const offsetY = typeof e.offsetY === 'number' ? e.offsetY : this.canvasHeight / 2
+
+      canvas.zoomToPoint({ x: offsetX, y: offsetY }, zoom)
 
       opt.e.preventDefault()
       opt.e.stopPropagation()
@@ -268,35 +528,79 @@ export class CanvasManager {
 
     canvas.on('mouse:down', (opt) => {
       const e = opt.e
-      const isRightClick = e.button === 2 || e.which === 3
+      if (!e) return
 
-      if (isSpacePressed || isRightClick) {
-        isDragging = true
-        canvas.selection = false
-        lastPosX = e.clientX
-        lastPosY = e.clientY
-        canvas.defaultCursor = 'grabbing'
-        canvas.setCursor('grabbing')
+      // Soporte para gesto táctil de dos dedos (pinch-to-zoom)
+      if (e.touches && e.touches.length >= 2) {
+        startPinch(e.touches[0], e.touches[1])
+        return
+      }
+      if (isPinching) {
         return
       }
 
-      if (e.button === 0 || !e.button) {
+      const isRightClick = e.button === 2 || e.which === 3
+      const isLeftClick = e.button === 0 || e.button === undefined || e.button === null
+
+      const shouldDrag = isSpacePressed || (this.activeTool === 'pan' && isLeftClick)
+
+      if (shouldDrag) {
+        const coords = getPointerClientCoords(e)
+        if (coords && Number.isFinite(coords.x) && Number.isFinite(coords.y)) {
+          isDragging = true
+          canvas.selection = false
+          lastPosX = coords.x
+          lastPosY = coords.y
+          canvas.defaultCursor = 'grabbing'
+          canvas.setCursor('grabbing')
+        }
+        return
+      }
+
+      if (isRightClick) {
+        return
+      }
+
+      if (isLeftClick) {
         this.toolService.handleMouseDown(opt)
       }
     })
 
     canvas.on('mouse:move', (opt) => {
+      const e = opt.e
+      if (!e) return
+
+      // Manejo de pellizco para zoom con dos dedos en pantallas táctiles
+      if (isPinching && e.touches && e.touches.length >= 2) {
+        movePinch(e.touches[0], e.touches[1])
+        return
+      }
+      if (isPinching) {
+        return
+      }
+
       if (isDragging) {
-        const e = opt.e
-        const vpt = canvas.viewportTransform
+        const coords = getPointerClientCoords(e)
+        if (
+          coords &&
+          Number.isFinite(coords.x) &&
+          Number.isFinite(coords.y) &&
+          Number.isFinite(lastPosX) &&
+          Number.isFinite(lastPosY)
+        ) {
+          const dx = coords.x - lastPosX
+          const dy = coords.y - lastPosY
+          const vpt = canvas.viewportTransform
 
-        vpt[4] += e.clientX - lastPosX
-        vpt[5] += e.clientY - lastPosY
+          if (Array.isArray(vpt) && vpt.length >= 6) {
+            vpt[4] += dx
+            vpt[5] += dy
+            canvas.requestRenderAll()
+          }
 
-        canvas.requestRenderAll()
-
-        lastPosX = e.clientX
-        lastPosY = e.clientY
+          lastPosX = coords.x
+          lastPosY = coords.y
+        }
         return
       }
 
@@ -304,11 +608,18 @@ export class CanvasManager {
     })
 
     canvas.on('mouse:up', (opt) => {
+      if (isPinching) {
+        if (!opt.e?.touches || opt.e.touches.length < 2) {
+          endPinch(opt.e?.touches ? Array.from(opt.e.touches) : [])
+        }
+        return
+      }
+
       if (isDragging) {
         isDragging = false
-        if (isSpacePressed) {
+        if (isSpacePressed || this.activeTool === 'pan') {
           canvas.defaultCursor = 'grab'
-        } else if (['rect', 'circle', 'arrow', 'text', 'pin'].includes(this.activeTool)) {
+        } else if (['rect', 'circle', 'arrow', 'polyline', 'polygon', 'text', 'pin'].includes(this.activeTool)) {
           canvas.defaultCursor = 'crosshair'
         } else {
           canvas.defaultCursor = 'default'
@@ -321,6 +632,13 @@ export class CanvasManager {
       }
 
       this.toolService.handleMouseUp(opt)
+    })
+
+    canvas.on('mouse:dblclick', (opt) => {
+      const e = opt.e
+      if (e.button === 0 || !e.button) {
+        this.toolService.handleMouseDblClick(opt)
+      }
     })
   }
 
@@ -337,7 +655,7 @@ export class CanvasManager {
   zoomIn(factor = 1.25) {
     if (!this.canvas) return
     let zoom = this.adapter.getZoom() * factor
-    if (zoom > 8) zoom = 8
+    if (zoom > 20) zoom = 20
     this.adapter.zoomToPoint({ x: this.canvasWidth / 2, y: this.canvasHeight / 2 }, zoom)
     this.adapter.requestRenderAll()
   }
@@ -345,7 +663,7 @@ export class CanvasManager {
   zoomOut(factor = 1.25) {
     if (!this.canvas) return
     let zoom = this.adapter.getZoom() / factor
-    if (zoom < 0.5) zoom = 0.5
+    if (zoom < 0.02) zoom = 0.02
     this.adapter.zoomToPoint({ x: this.canvasWidth / 2, y: this.canvasHeight / 2 }, zoom)
     this.adapter.requestRenderAll()
   }
@@ -364,6 +682,11 @@ export class CanvasManager {
     this.activeTool = tool
     this.updateToolbarAriaPressed(tool)
     this.announceA11y(`Herramienta ${tool} activada`)
+
+    if (typeof this.onToolChange === 'function') {
+      this.onToolChange(tool)
+    }
+
     if (!this.canvas) return
 
     if (this.toolService) {
@@ -383,6 +706,7 @@ export class CanvasManager {
 
   updateToolbarAriaPressed(activeTool) {
     const toolMap = {
+      pan: 'tool-pan',
       select: 'tool-select',
       brush: 'tool-brush',
       rect: 'tool-rect',
@@ -401,6 +725,23 @@ export class CanvasManager {
     })
   }
 
+  /**
+   * Determina la propiedad de color principal (fill o stroke) para un objeto.
+   * @param {Object} obj
+   * @returns {string|null}
+   */
+  getPrimaryColorProperty(obj) {
+    if (!obj) return null
+    if (obj.type === 'textbox') return 'fill'
+    if (obj.type === 'polyline') return 'stroke'
+    if (obj.type === 'path') {
+      const pathData = obj.path ? obj.path.toString() : ''
+      const isPin = pathData.includes('C -12 -13') || pathData.includes('M 0 0 C -12')
+      return isPin ? 'fill' : 'stroke'
+    }
+    return 'fill'
+  }
+
   setActiveColor(color) {
     this.activeColor = color
     this.configureDrawingBrush()
@@ -408,14 +749,19 @@ export class CanvasManager {
     if (this.canvas) {
       const activeObject = this.adapter.getActiveObject()
       if (activeObject) {
-        if (activeObject.type === 'textbox') {
-          activeObject.set({ fill: color })
-        } else if (activeObject.type === 'path' && activeObject.fill === 'transparent') {
-          activeObject.set({ stroke: color })
-        } else if (activeObject.type === 'group' || activeObject.getObjects) {
+        if (activeObject.type === 'group' || activeObject.getObjects) {
           this.colorSVGGroup(activeObject, color)
         } else {
-          activeObject.set({ fill: color, stroke: color })
+          const prop = this.getPrimaryColorProperty(activeObject)
+          if (prop === 'fill') {
+            const hasSameStroke = activeObject.stroke === activeObject.fill
+            activeObject.set({ fill: color })
+            if (hasSameStroke && ['rect', 'circle', 'polygon'].includes(activeObject.type)) {
+              activeObject.set({ stroke: color })
+            }
+          } else if (prop === 'stroke') {
+            activeObject.set({ stroke: color })
+          }
         }
         this.adapter.requestRenderAll()
         this.adapter.fire('object:modified')
@@ -423,8 +769,9 @@ export class CanvasManager {
     }
   }
 
-  setActiveStrokeWidth(width) {
-    this.activeStrokeWidth = parseInt(width, 10)
+  setActiveStrokeWidth(width, fireEvent = true) {
+    const raw = parseInt(width, 10)
+    this.activeStrokeWidth = raw <= 24 ? raw * 3 : raw
     this.configureDrawingBrush()
 
     if (this.canvas) {
@@ -432,7 +779,9 @@ export class CanvasManager {
       if (activeObject && activeObject.type !== 'textbox') {
         activeObject.set({ strokeWidth: this.activeStrokeWidth })
         this.adapter.requestRenderAll()
-        this.adapter.fire('object:modified')
+        if (fireEvent) {
+          this.adapter.fire('object:modified')
+        }
       }
     }
   }
@@ -449,7 +798,7 @@ export class CanvasManager {
     }
 
     const angle = Math.atan2(dy, dx)
-    const headLen = Math.min(Math.max(15, this.activeStrokeWidth * 2.5), Math.max(15, dist * 0.35))
+    const headLen = Math.min(Math.max(35, this.activeStrokeWidth * 2.5), Math.max(35, dist * 0.35))
     const arrowAngle = Math.PI / 6
 
     const x3 = x2 - headLen * Math.cos(angle - arrowAngle)
@@ -466,18 +815,34 @@ export class CanvasManager {
       evented: true,
     })
 
-    this.canvas.setActiveObject(shape)
-    this.canvas.requestRenderAll()
-    this.canvas.fire('object:modified')
-
-    if (toolWas === 'text' && typeof shape.enterEditing === 'function') {
-      shape.enterEditing()
-      shape.selectAll()
+    if (typeof shape.setCoords === 'function') {
+      shape.setCoords()
     }
 
-    this.setTool('select')
-    if (typeof this.onToolChange === 'function') {
-      this.onToolChange('select')
+    if (toolWas === 'text' && typeof shape.enterEditing === 'function') {
+      this.canvas.setActiveObject(shape)
+      this.canvas.requestRenderAll()
+      this.canvas.fire('object:modified')
+      shape.enterEditing()
+      if (typeof shape.selectAll === 'function') {
+        shape.selectAll()
+      }
+
+      const onEditingExited = () => {
+        if (typeof shape.off === 'function') {
+          shape.off('editing:exited', onEditingExited)
+        }
+        if (this.activeTool === 'text' && this.adapter) {
+          this.adapter.discardActiveObject()
+          this.adapter.requestRenderAll()
+        }
+      }
+      if (typeof shape.on === 'function') {
+        shape.on('editing:exited', onEditingExited)
+      }
+    } else {
+      this.canvas.requestRenderAll()
+      this.canvas.fire('object:modified')
     }
   }
 
@@ -517,12 +882,15 @@ export class CanvasManager {
     if (!this.canvas) return
     const center = this.getViewportCenter()
 
-    const arrow = ShapeFactory.createArrow('M -50 0 L 50 0 M 20 -15 L 50 0 L 20 15', {
-      left: center.left,
-      top: center.top,
-      color: this.activeColor,
-      strokeWidth: this.activeStrokeWidth,
-    })
+    const arrow = ShapeFactory.createArrow(
+      this.createArrowPath(center.left - 150, center.top, center.left + 150, center.top),
+      {
+        left: center.left,
+        top: center.top,
+        color: this.activeColor,
+        strokeWidth: this.activeStrokeWidth,
+      }
+    )
 
     this.adapter.addObject(arrow)
     this.adapter.setActiveObject(arrow)
@@ -565,10 +933,22 @@ export class CanvasManager {
   deleteSelected() {
     if (!this.canvas) return
     const activeObject = this.adapter.getActiveObject()
-    if (activeObject && activeObject !== this.currentMapImage) {
-      const cmd = new DeleteCommand(this, activeObject)
-      this.commandHistory.execute(cmd)
+    if (!activeObject || activeObject === this.currentMapImage) return
+
+    if (activeObject.type === 'activeSelection' && typeof activeObject.forEachObject === 'function') {
+      activeObject.forEachObject((obj) => {
+        if (obj !== this.currentMapImage) {
+          this.adapter.removeObject(obj)
+        }
+      })
+    } else {
+      this.adapter.removeObject(activeObject)
     }
+
+    this.adapter.discardActiveObject()
+    this.adapter.requestRenderAll()
+    this.adapter.fire('object:modified')
+    this.announceA11y('Elemento eliminado')
   }
 
   async duplicateSelected() {
@@ -576,32 +956,61 @@ export class CanvasManager {
     const activeObject = this.adapter.getActiveObject()
     if (!activeObject || activeObject === this.currentMapImage) return
 
-    const cmd = new DuplicateCommand(this, activeObject)
-    await this.commandHistory.execute(cmd)
+    try {
+      const cloned = await activeObject.clone()
+      cloned.set({
+        left: activeObject.left + 20,
+        top: activeObject.top + 20,
+        evented: true,
+        selectable: true,
+      })
+
+      if (cloned.type === 'activeSelection') {
+        cloned.canvas = this.canvas
+        cloned.forEachObject((obj) => {
+          this.adapter.addObject(obj)
+        })
+        cloned.setCoordinates()
+      } else {
+        this.adapter.addObject(cloned)
+      }
+
+      this.adapter.setActiveObject(cloned)
+      this.adapter.requestRenderAll()
+      this.adapter.fire('object:modified')
+    } catch (err) {
+      console.error('CanvasManager: Error clonando objeto:', err)
+    }
   }
 
   bringToFront() {
     if (!this.canvas) return
     const activeObject = this.adapter.getActiveObject()
     if (activeObject && activeObject !== this.currentMapImage) {
-      const cmd = new BringToFrontCommand(this, activeObject)
-      this.commandHistory.execute(cmd)
+      this.adapter.bringObjectToFront(activeObject)
+      this.adapter.requestRenderAll()
+      this.adapter.fire('object:modified')
     }
   }
 
   sendToBack() {
     if (!this.canvas) return
     const activeObject = this.adapter.getActiveObject()
-    if (activeObject && activeObject !== this.currentMapImage) {
-      const cmd = new SendToBackCommand(this, activeObject)
-      this.commandHistory.execute(cmd)
+    if (activeObject && activeObject !== this.currentMapImage && activeObject.isMapBase !== true) {
+      this.adapter.sendObjectToBack(activeObject)
+      const mapBaseObj = this.currentMapImage || this.adapter.getObjects().find((obj) => obj.isMapBase === true)
+      if (mapBaseObj) {
+        this.adapter.sendObjectToBack(mapBaseObj)
+      }
+      this.adapter.requestRenderAll()
+      this.adapter.fire('object:modified')
     }
   }
 
   clearCanvas() {
     if (!this.canvas) return
-    const cmd = new ClearCommand(this)
-    this.commandHistory.execute(cmd)
+    this.clearAllObjects()
+    this.adapter.fire('object:modified')
   }
 
   serialize() {
@@ -610,12 +1019,16 @@ export class CanvasManager {
     const objects = this.adapter
       .getObjects()
       .filter((obj) => obj !== this.currentMapImage && obj.isMapBase !== true)
-    const serializedObjects = objects.map((obj) => obj.toObject())
+    const serializedObjects = objects.map((obj) =>
+      typeof obj.toObject === 'function' ? obj.toObject() : { ...obj }
+    )
     return JSON.stringify(serializedObjects)
   }
 
   async deserialize(jsonString) {
-    if (!this.canvas || !jsonString) return
+    if (!this.canvas) return
+    this.clearAllObjects()
+    if (!jsonString) return
 
     try {
       const jsonObjects = JSON.parse(jsonString)
@@ -625,6 +1038,10 @@ export class CanvasManager {
 
       this.canvas.renderOnAddRemove = false
       objects.forEach((obj) => {
+        obj.set({
+          selectable: true,
+          evented: true,
+        })
         this.adapter.addObject(obj)
       })
       this.canvas.renderOnAddRemove = true
@@ -634,11 +1051,20 @@ export class CanvasManager {
     }
   }
 
-  exportToPNG(fileName = 'mapa_anotado.png') {
-    ExportService.exportToPNG(this, fileName)
+  async exportToPNG(fileName = 'mapa_anotado.png') {
+    const { ExportService } = await import('./export/ExportService.js')
+    return ExportService.exportToPNG(this, fileName)
   }
 
   dispose() {
+    if (this._touchCleanup) {
+      this._touchCleanup()
+      this._touchCleanup = null
+    }
+    if (this._keyCleanup) {
+      this._keyCleanup()
+      this._keyCleanup = null
+    }
     if (this.resizeManager) {
       this.resizeManager.disconnect()
     }
@@ -654,11 +1080,19 @@ export class CanvasManager {
       const { objects, options } = await this.adapter.loadSVG(url)
       const stickerGroup = this.adapter.groupSVGElements(objects, options)
 
+      // Escalar el sticker para que tenga un tamaño inicial adecuado en coordenadas canónicas (250px)
+      const targetSize = 250
+      const width = stickerGroup.width || targetSize
+      const height = stickerGroup.height || targetSize
+      const scale = Math.min(targetSize / width, targetSize / height)
+
       stickerGroup.set({
         left: center.left,
         top: center.top,
         originX: 'center',
         originY: 'center',
+        scaleX: scale,
+        scaleY: scale,
         cornerColor: '#000000',
         transparentCorners: false,
         cornerSize: 10,
@@ -666,10 +1100,6 @@ export class CanvasManager {
         borderScaleFactor: 2,
         hasRotatingPoint: true,
       })
-
-      // Escalar el sticker para que tenga un tamaño inicial óptimo de 100px max
-      const scale = Math.min(100 / stickerGroup.width, 100 / stickerGroup.height, 1)
-      stickerGroup.scale(scale)
 
       // Colorear el sticker con el color activo
       this.colorSVGGroup(stickerGroup, this.activeColor)
@@ -729,7 +1159,7 @@ export class CanvasManager {
         {}
       )
 
-      const maxDim = Math.min(this.canvasWidth * 0.5, this.canvasHeight * 0.5, 400)
+      const maxDim = Math.min(this.currentMapImage ? this.currentMapImage.width * 0.4 : 600, 600)
       let scale = 1
       if (img.width > maxDim || img.height > maxDim) {
         scale = Math.min(maxDim / img.width, maxDim / img.height)
@@ -815,10 +1245,43 @@ export class CanvasManager {
   }
 
   undo() {
-    this.commandHistory.undo()
+    return this.historyManager.undo()
   }
 
   redo() {
-    this.commandHistory.redo()
+    return this.historyManager.redo()
+  }
+
+  createMemento() {
+    const stateStr = this.serialize()
+    return new Memento(stateStr)
+  }
+
+  async restoreMemento(memento) {
+    if (!memento) return
+    this.isRestoringHistory = true
+    try {
+      await this.deserialize(memento.getState())
+      this.adapter.discardActiveObject()
+      this.adapter.requestRenderAll()
+      this.announceA11y('Estado restaurado')
+      this.adapter.fire('history:restored')
+    } catch (error) {
+      console.error('Error restaurando el memento:', error)
+    } finally {
+      this.isRestoringHistory = false
+    }
+  }
+
+  clearAllObjects() {
+    if (!this.canvas) return
+    const objects = [...this.adapter.getObjects()]
+    objects.forEach((obj) => {
+      if (obj !== this.currentMapImage && obj.isMapBase !== true) {
+        this.adapter.removeObject(obj)
+      }
+    })
+    this.adapter.discardActiveObject()
+    this.adapter.requestRenderAll()
   }
 }

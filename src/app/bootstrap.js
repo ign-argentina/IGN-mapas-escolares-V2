@@ -1,29 +1,37 @@
 import { appStore } from '../state/AppStore.js'
 import { CanvasManager } from '../core/canvasManager.js'
-import { persistenceService } from '../core/persistence/PersistenceService.js'
+import { persistenceService, isQuotaExceededError } from '../core/persistence/PersistenceService.js'
 import { MapSelector } from '../components/MapSelector.js'
+import { Sidebar } from '../components/Sidebar.js'
+import { AccessibilityPanel } from '../components/AccessibilityPanel.js'
+import { HelpPanel } from '../components/HelpPanel.js'
+import { AccessibilityManager } from '../core/accessibility/AccessibilityManager.js'
 import { ContextMenu } from '../features/context-menu/ContextMenu.js'
-import { ExportModal } from '../features/export-modal/ExportModal.js'
 import { Toolbar } from '../features/toolbar/Toolbar.js'
 import { ColorPalette } from '../features/color-palette/ColorPalette.js'
 import { StickersPanel } from '../features/stickers-panel/StickersPanel.js'
 import { configRepository } from '../core/repositories/ConfigRepository.js'
 import { mapRepository } from '../core/repositories/MapRepository.js'
+import { TourStorage } from '../features/help-tour/TourStorage.js'
+import { ExternalLinksPanel } from '../components/ExternalLinksPanel.js'
+import { trackMapSelect } from '../core/analytics/analytics.js'
 
 /**
  * Inicializa y configura todas las capas y componentes de la aplicación.
  * Realiza la inyección de dependencias y personalizaciones dinámicas desde config.json.
  */
 export async function bootstrap() {
+  // Inicializar AccessibilityManager para aplicar preferencias inmediatamente en el arranque
+  const accessibilityManager = new AccessibilityManager(appStore)
+  accessibilityManager.init()
+
   if (window.lucide) {
     window.lucide.createIcons()
   }
 
   // Obtener elementos fundamentales de la UI
   const editorContainer = document.getElementById('editor-container')
-  const sidebar = document.getElementById('sidebar-catalog')
-  const closeSidebarBtn = document.getElementById('close-sidebar-btn')
-  const toggleSidebarBtn = document.getElementById('toggle-sidebar-btn')
+  const sidebarContainer = document.getElementById('sidebar-catalog')
   const cardsContainer = document.getElementById('map-cards-container')
   const loaderOverlay = document.getElementById('loader-overlay')
 
@@ -35,24 +43,7 @@ export async function bootstrap() {
   const canvasManager = new CanvasManager(editorContainer)
   canvasManager.init()
 
-  // --- INTERACTIVIDAD DEL PANEL LATERAL COLAPSABLE ---
-  closeSidebarBtn.addEventListener('click', () => {
-    sidebar.classList.add('is-collapsed')
-    toggleSidebarBtn.classList.remove('hidden')
-    toggleSidebarBtn.setAttribute('aria-expanded', 'false')
-    toggleSidebarBtn.focus()
-  })
-
-  toggleSidebarBtn.addEventListener('click', () => {
-    sidebar.classList.remove('is-collapsed')
-    toggleSidebarBtn.classList.add('hidden')
-    toggleSidebarBtn.setAttribute('aria-expanded', 'true')
-    closeSidebarBtn.focus()
-  })
-
   // --- ESCUCHAR CAMBIOS EN EL ESTADO GLOBAL (REACTIVIDAD Y PERSISTENCIA) ---
-  let previousMapId = null
-
   function saveDrawingState(immediate = false) {
     const currentMapId = appStore.getState().activeMapId
     if (currentMapId && canvasManager.canvas) {
@@ -69,60 +60,50 @@ export async function bootstrap() {
     }
   }
 
-  appStore.subscribe(async (state) => {
-    if (!state.activeMapId) return
-
-    // 1. Guardar el estado del dibujo de la provincia anterior inmediatamente al cambiar
-    if (previousMapId && previousMapId !== state.activeMapId) {
-      const prevJson = canvasManager.serialize()
-      if (prevJson) {
-        persistenceService.save(`drawing_${previousMapId}`, prevJson)
-      } else {
-        persistenceService.remove(`drawing_${previousMapId}`)
-      }
-    }
-
-    // Actualizar el ID previo para la próxima iteración
-    previousMapId = state.activeMapId
-
-    // 2. Limpiar dibujos transitorios antes de cargar el nuevo mapa
-    canvasManager.clearCanvas()
-
-    // 3. Cargar el mapa en el Canvas
-    const mapData = await mapRepository.getById(state.activeMapId)
-    if (mapData) {
-      loaderOverlay.classList.remove('hidden')
-      try {
-        const mapSource = configRepository.getMapImageSource()
-        const mapUrl =
-          mapSource === 'imagePath'
-            ? mapData.imagePath
-              ? `${import.meta.env.BASE_URL.replace(/\/$/, '')}${mapData.imagePath}`
-              : mapData.imageUrl
-            : mapData.imageUrl || `${import.meta.env.BASE_URL.replace(/\/$/, '')}${mapData.imagePath}`
-        await canvasManager.loadMap(mapUrl)
-
-        // 4. Cargar dibujos guardados de la provincia activa (si existen)
-        const savedJson = persistenceService.load(`drawing_${state.activeMapId}`)
-        if (savedJson) {
-          await canvasManager.deserialize(savedJson)
-        }
-      } catch (err) {
-        console.error('Error cargando el mapa en el lienzo:', err)
-      } finally {
-        setTimeout(() => {
-          loaderOverlay.classList.add('hidden')
-        }, 600)
-      }
-    }
+  const mapStateSubscriber = createMapStateSubscriber({
+    canvasManager,
+    mapRepository,
+    configRepository,
+    persistenceService,
+    loaderOverlay,
   })
+  appStore.subscribe(mapStateSubscriber)
 
   // Suscribirse a eventos del canvas para autoguardado en tiempo real
   if (canvasManager.canvas) {
-    canvasManager.canvas.on('object:added', () => saveDrawingState(false))
-    canvasManager.canvas.on('object:modified', () => saveDrawingState(false))
-    canvasManager.canvas.on('object:removed', () => saveDrawingState(false))
+    canvasManager.canvas.on('object:added', () => {
+      if (!canvasManager.isRestoringHistory) saveDrawingState(false)
+    })
+    canvasManager.canvas.on('object:modified', () => {
+      if (!canvasManager.isRestoringHistory) saveDrawingState(false)
+    })
+    canvasManager.canvas.on('object:removed', () => {
+      if (!canvasManager.isRestoringHistory) saveDrawingState(false)
+    })
+    canvasManager.canvas.on('history:restored', () => {
+      saveDrawingState(true)
+    })
   }
+
+  // Escuchar errores de persistencia (como exceder la cuota de LocalStorage) para alertar al usuario sin spam
+  let hasShownQuotaError = false
+  persistenceService.on('error', (error) => {
+    if (isQuotaExceededError(error)) {
+      if (!hasShownQuotaError) {
+        hasShownQuotaError = true
+        alert(
+          'El dibujo actual no pudo guardarse en el navegador porque el espacio de almacenamiento disponible está lleno.\n\nExiste riesgo de perder tus cambios si cerrás o recargás la página. Te recomendamos exportar o descargar tu trabajo para no perderlo.'
+        )
+      }
+    } else {
+      console.error('Error de persistencia no crítico para el usuario:', error)
+    }
+  })
+
+  persistenceService.on('success', () => {
+    // Si se guarda con éxito, restablecer el flag para poder alertar de nuevo en el futuro
+    hasShownQuotaError = false
+  })
 
   // --- ACCIONES DEL SISTEMA (IMPORTACIÓN DE IMAGEN) ---
   const importImageBtn = document.getElementById('action-import-image')
@@ -139,9 +120,13 @@ export async function bootstrap() {
         await canvasManager.addLocalImage(file)
       } catch (err) {
         if (err.message === 'FILE_TOO_LARGE') {
-          alert('El archivo seleccionado supera el límite de 10 MB. Por favor, elige una imagen más liviana.')
+          alert(
+            'El archivo seleccionado supera el límite de 10 MB. Por favor, elige una imagen más liviana.'
+          )
         } else {
-          alert('No se pudo cargar la imagen. Es posible que el archivo esté dañado o tenga un formato no compatible.')
+          alert(
+            'No se pudo cargar la imagen. Es posible que el archivo esté dañado o tenga un formato no compatible.'
+          )
         }
       } finally {
         imageFileInput.value = ''
@@ -152,26 +137,23 @@ export async function bootstrap() {
   // --- INICIALIZACIÓN ASÍNCRONA DE CONFIGURACIÓN Y COMPONENTES ---
   loaderOverlay.classList.remove('hidden')
   try {
-    // 1. Cargar la configuración remota JSON
-    await configRepository.load()
-    const uiConfig = configRepository.getUiConfig()
-
-    // Cargar dinámicamente custom.css o el fallback default/custom.css
-    const cssLink = document.createElement('link')
-    cssLink.rel = 'stylesheet'
+    // 1. Cargar la configuración remota JSON y resolver custom.css en paralelo
     const customCssUrl = `${import.meta.env.BASE_URL}config/custom.css`
     const defaultCssUrl = `${import.meta.env.BASE_URL}config/default/custom.css`
-    try {
-      const resp = await fetch(customCssUrl, { method: 'HEAD' })
-      if (resp.ok) {
-        cssLink.href = customCssUrl
-      } else {
+    const loadCssPromise = (async () => {
+      const cssLink = document.createElement('link')
+      cssLink.rel = 'stylesheet'
+      try {
+        const resp = await fetch(customCssUrl, { method: 'HEAD' })
+        cssLink.href = resp.ok ? customCssUrl : defaultCssUrl
+      } catch {
         cssLink.href = defaultCssUrl
       }
-    } catch {
-      cssLink.href = defaultCssUrl
-    }
-    document.head.appendChild(cssLink)
+      document.head.appendChild(cssLink)
+    })()
+
+    await Promise.all([configRepository.load(), loadCssPromise])
+    const uiConfig = configRepository.getUiConfig()
 
     // Inyectar paleta de colores del tema en variables CSS del :root
     if (uiConfig.theme) {
@@ -180,14 +162,14 @@ export async function bootstrap() {
       themeStyle.innerHTML = `
         :root {
           --nbi-bg-main: ${uiConfig.theme.background || '#FAFAFA'};
-          --nbi-primary-color: ${uiConfig.theme.primary || '#63ccfd'};
-          --nbi-secondary-color: ${uiConfig.theme.secondary || '#B391f0'};
-          --nbi-accent-color: ${uiConfig.theme.accent || '#FBE158'};
+          --nbi-primary-color: ${uiConfig.theme.primary || '#41C0F0'};
+          --nbi-secondary-color: ${uiConfig.theme.secondary || '#9678ce'};
+          --nbi-accent-color: ${uiConfig.theme.accent || '#EEC461'};
           --nbi-text-color: ${uiConfig.theme.text || '#000000'};
           --nbi-icons-color: ${uiConfig.theme.icons || '#757575'};
-          --nbi-success-color: ${uiConfig.theme.success || '#7ABE7D'};
-          --nbi-danger-color: ${uiConfig.theme.danger || '#c25b56'};
-          --nbi-panel-bg: ${uiConfig.theme.panelBackground || '#ebebeb'};
+          --nbi-success-color: ${uiConfig.theme.success || '#00B2BB'};
+          --nbi-danger-color: ${uiConfig.theme.danger || '#EB5E50'};
+          --nbi-color-panel-bg: ${uiConfig.theme.panelBackground || '#ebebeb'};
         }
       `
       document.head.appendChild(themeStyle)
@@ -199,8 +181,13 @@ export async function bootstrap() {
       headerTitle.textContent = uiConfig.title
     }
 
+    const headerSubtitle = document.querySelector('.nbi-navbar__subtitle')
+    if (headerSubtitle && uiConfig.subtitle) {
+      headerSubtitle.textContent = uiConfig.subtitle
+    }
+
     const headerLogo = document.querySelector('.nbi-navbar__logo')
-    if (headerLogo && uiConfig.logoUrl) {
+    if (headerLogo && headerLogo.tagName.toLowerCase() === 'img' && uiConfig.logoUrl) {
       headerLogo.src = `${import.meta.env.BASE_URL.replace(/\/$/, '')}${uiConfig.logoUrl}`
     }
 
@@ -209,27 +196,66 @@ export async function bootstrap() {
       logoLink.href = uiConfig.logoLink
     }
 
-    const externalLink = document.getElementById('ign-link-btn')
-    if (externalLink && uiConfig.externalLink) {
-      if (uiConfig.externalLink.visible === false) {
-        externalLink.classList.add('hidden')
-      } else {
-        externalLink.classList.remove('hidden')
-        externalLink.href =
-          uiConfig.externalLink.href ||
-          'https://www.ign.gob.ar/AreaServicios/Descargas/MapasEscolares'
-        const spanText = externalLink.querySelector('.btn-text')
-        if (spanText) {
-          spanText.textContent = uiConfig.externalLink.text || 'Descargar Mapas Oficiales'
-        }
+    // 3. Ocultar / colapsar paneles por defecto si se inicia desde celular o pantalla chica
+    const isSmallScreen =
+      typeof window !== 'undefined' &&
+      (window.innerWidth <= 768 ||
+        (typeof window.matchMedia === 'function' &&
+          window.matchMedia('(max-width: 768px)').matches))
+
+    if (isSmallScreen) {
+      if (sidebarContainer) {
+        sidebarContainer.classList.add('is-collapsed')
+      }
+      const propertiesPanelEl = document.getElementById('properties-panel')
+      if (propertiesPanelEl) {
+        propertiesPanelEl.classList.add('is-collapsed')
       }
     }
 
+    // Inicializar panel lateral dinámico y selector de mapas
+    const externalResourcesConfig = configRepository.getExternalResources()
+    const linksTabConfig = externalResourcesConfig?.tab || {
+      id: 'links',
+      label: 'Enlaces',
+      title: 'Recursos del IGN',
+      icon: 'external-link',
+    }
 
+    const sidebar = new Sidebar(sidebarContainer, {
+      views: [
+        {
+          id: 'maps',
+          label: 'Mapas',
+          title: 'Elegí tu Mapa',
+          icon: 'public/icono-mapa-mapas-escolares-01.svg',
+        },
+        {
+          id: 'accessibility',
+          label: 'Accesibilidad',
+          title: 'Accesibilidad',
+          icon: 'person-standing',
+        },
+        {
+          id: 'help',
+          label: 'Ayuda',
+          title: 'Ayuda',
+          icon: 'circle-question-mark',
+        },
+        {
+          id: linksTabConfig.id || 'links',
+          label: linksTabConfig.label || 'Enlaces',
+          title: linksTabConfig.title || 'Recursos del IGN',
+          icon: linksTabConfig.icon || 'external-link',
+        },
+      ],
+    })
+    sidebar.mount()
 
-    // 3. Inicializar y montar componentes UI modulares
+    // 4. Inicializar y montar componentes UI modulares
     const toolbar = new Toolbar(document.getElementById('toolbar-container') || editorContainer, {
       canvasManager,
+      sidebar,
     })
     toolbar.mount()
 
@@ -243,32 +269,206 @@ export async function bootstrap() {
       document.getElementById('stickers-panel') || editorContainer,
       { canvasManager }
     )
-    await stickersPanel.render()
-    stickersPanel.bindEvents()
+    stickersPanel.mount()
 
     new ContextMenu(canvasManager)
 
-    const exportModal = new ExportModal(canvasManager, mapRepository)
-    document.getElementById('action-export')?.addEventListener('click', () => {
-      exportModal.open()
+    // Carga diferida (lazy loading) del modal de exportación
+    let exportModalInstance = null
+    document.getElementById('action-export')?.addEventListener('click', async () => {
+      if (!exportModalInstance) {
+        const { ExportModal } = await import('../features/export-modal/ExportModal.js')
+        exportModalInstance = new ExportModal(canvasManager, mapRepository)
+      }
+      exportModalInstance.open()
     })
 
-    // 4. Inicializar selector de mapas modularizado
-    const mapSelector = new MapSelector(sidebar, cardsContainer, mapRepository)
+    const mapSelector = new MapSelector(
+      sidebarContainer.querySelector('#view-maps'),
+      cardsContainer,
+      mapRepository
+    )
     await mapSelector.init()
+
+    const accessibilityPanel = new AccessibilityPanel(
+      sidebarContainer.querySelector('#view-accessibility')
+    )
+    accessibilityPanel.mount()
+
+    // 5. Inicialización bajo demanda del recorrido guiado (Tour)
+    let tourControllerInstance = null
+    const getTour = async () => {
+      if (!tourControllerInstance) {
+        const [{ TourController }, { generalTour }] = await Promise.all([
+          import('../features/help-tour/TourController.js'),
+          import('../features/help-tour/tours/generalTour.js'),
+        ])
+        tourControllerInstance = {
+          controller: new TourController({ canvasManager, sidebar, appStore }),
+          generalTour,
+        }
+      }
+      return tourControllerInstance
+    }
+
+    // Mostrar modal de bienvenida únicamente si el usuario no ha descartado el aviso
+    let welcomeModal = null
+    if (TourStorage.shouldShowAutoPrompt('general', 1)) {
+      const [{ TourWelcomeModal }, { generalTour }] = await Promise.all([
+        import('../features/help-tour/TourWelcomeModal.js'),
+        import('../features/help-tour/tours/generalTour.js'),
+      ])
+
+      welcomeModal = new TourWelcomeModal(document.body, {
+        onStart: async ({ dontShowAgain }) => {
+          if (dontShowAgain) {
+            TourStorage.setTourAutoPromptDismissed(generalTour.id, generalTour.version)
+          }
+          const { controller, generalTour: tour } = await getTour()
+          controller.start(tour)
+        },
+        onDismiss: ({ dontShowAgain }) => {
+          if (dontShowAgain) {
+            TourStorage.setTourAutoPromptDismissed(generalTour.id, generalTour.version)
+          }
+        },
+      })
+      welcomeModal.mount()
+    }
+
+    const helpViewContainer = sidebarContainer.querySelector('#view-help')
+    if (helpViewContainer) {
+      const helpPanel = new HelpPanel(helpViewContainer, {
+        onStartTour: async (e) => {
+          const triggerEl = e && e.currentTarget ? e.currentTarget : null
+          const { controller, generalTour } = await getTour()
+          controller.start(generalTour, triggerEl)
+        },
+      })
+      helpPanel.mount()
+    }
+
+    const linksViewContainer = sidebarContainer.querySelector('#view-links')
+    if (linksViewContainer) {
+      const linksPanel = new ExternalLinksPanel(linksViewContainer, {
+        intro: externalResourcesConfig?.intro,
+        resources: externalResourcesConfig?.items,
+      })
+      linksPanel.mount()
+    }
 
     if (window.lucide) {
       window.lucide.createIcons()
     }
 
-    // 5. Activar por defecto la primera provincia del catálogo
+    // 6. Activar por defecto el mapa configurado (o 'argentina')
     const maps = await mapRepository.getAll()
     if (maps.length > 0) {
-      appStore.dispatch({ type: 'SET_ACTIVE_MAP_ID', payload: maps[0].id })
+      const defaultMapId = configRepository.getDefaultMapId()
+      const targetMap = maps.find((m) => m.id === defaultMapId) || maps[0]
+      appStore.dispatch({ type: 'SET_ACTIVE_MAP_ID', payload: targetMap.id })
+    }
+
+    // 7. Mostrar invitación automática en el primer arranque si corresponde
+    if (welcomeModal) {
+      setTimeout(() => {
+        welcomeModal.open()
+      }, 700)
     }
   } catch (err) {
     console.error('Error al inicializar la aplicación:', err)
   } finally {
     loaderOverlay.classList.add('hidden')
+  }
+}
+
+/**
+ * Crea el manejador de suscripción de AppStore para la carga y reactividad de mapas.
+ * Asegura que el mapa se recargue y el historial se reinicie únicamente cuando activeMapId cambie de forma efectiva.
+ *
+ * @param {Object} params
+ * @param {Object} params.canvasManager
+ * @param {Object} params.mapRepository
+ * @param {Object} params.configRepository
+ * @param {Object} params.persistenceService
+ * @param {HTMLElement|null} [params.loaderOverlay]
+ * @returns {Function} Callback asíncrono para appStore.subscribe
+ */
+export function createMapStateSubscriber({
+  canvasManager,
+  mapRepository,
+  configRepository,
+  persistenceService,
+  loaderOverlay = null,
+}) {
+  let previousMapId = null
+
+  return async (state) => {
+    if (!state || !state.activeMapId) return
+    if (state.activeMapId === previousMapId) return
+
+    const newMapId = state.activeMapId
+
+    // 1. Guardar el estado del dibujo de la provincia anterior inmediatamente al cambiar
+    if (previousMapId && previousMapId !== newMapId && canvasManager) {
+      const prevJson = canvasManager.serialize()
+      if (prevJson) {
+        persistenceService.save(`drawing_${previousMapId}`, prevJson)
+      } else {
+        persistenceService.remove(`drawing_${previousMapId}`)
+      }
+    }
+
+    // Actualizar el ID previo antes de cualquier await para evitar condiciones de carrera
+    previousMapId = newMapId
+
+    // 2. Limpiar dibujos transitorios antes de cargar el nuevo mapa
+    if (canvasManager) {
+      canvasManager.clearCanvas()
+    }
+
+    // 3. Cargar el mapa en el Canvas
+    const mapData = await mapRepository.getById(newMapId)
+    if (mapData && canvasManager) {
+      trackMapSelect({
+        mapName: mapData.name,
+        mapId: newMapId,
+      })
+
+      if (loaderOverlay) {
+        loaderOverlay.classList.remove('hidden')
+      }
+      try {
+        const mapSource = configRepository.getMapImageSource()
+        const mapUrl =
+          mapSource === 'imagePath'
+            ? mapData.imagePath
+              ? `${(import.meta.env?.BASE_URL || '/').replace(/\/$/, '')}${mapData.imagePath}`
+              : mapData.imageUrl
+            : mapData.imageUrl ||
+              `${(import.meta.env?.BASE_URL || '/').replace(/\/$/, '')}${mapData.imagePath}`
+        await canvasManager.loadMap(mapUrl)
+
+        // 4. Cargar dibujos guardados de la provincia activa (si existen)
+        const savedJson = persistenceService.load(`drawing_${newMapId}`)
+        if (savedJson) {
+          await canvasManager.deserialize(savedJson)
+        }
+
+        // Inicializar el historial para el nuevo mapa
+        if (canvasManager.historyManager) {
+          canvasManager.historyManager.clear()
+          canvasManager.historyManager.capture()
+        }
+      } catch (err) {
+        console.error('Error cargando el mapa en el lienzo:', err)
+      } finally {
+        if (loaderOverlay) {
+          setTimeout(() => {
+            loaderOverlay.classList.add('hidden')
+          }, 600)
+        }
+      }
+    }
   }
 }

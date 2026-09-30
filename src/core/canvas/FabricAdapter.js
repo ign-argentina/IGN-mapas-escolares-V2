@@ -1,4 +1,26 @@
-import { Canvas, FabricImage, PencilBrush, util, loadSVGFromURL, filters } from 'fabric'
+import { Canvas, FabricImage, PencilBrush, util, loadSVGFromURL, filters, FabricObject } from 'fabric'
+
+// Configuración de bordes y manejadores de control (handles) oscuros para todos los objetos
+if (FabricObject) {
+  if (!FabricObject.ownDefaults) {
+    FabricObject.ownDefaults = {}
+  }
+  FabricObject.ownDefaults.borderColor = '#000000'
+  FabricObject.ownDefaults.cornerColor = '#000000'
+  FabricObject.ownDefaults.cornerStrokeColor = '#000000'
+  FabricObject.ownDefaults.transparentCorners = false
+  FabricObject.ownDefaults.cornerSize = 10
+  FabricObject.ownDefaults.borderScaleFactor = 2
+
+  if (FabricObject.prototype) {
+    FabricObject.prototype.borderColor = '#000000'
+    FabricObject.prototype.cornerColor = '#000000'
+    FabricObject.prototype.cornerStrokeColor = '#000000'
+    FabricObject.prototype.transparentCorners = false
+    FabricObject.prototype.cornerSize = 10
+    FabricObject.prototype.borderScaleFactor = 2
+  }
+}
 
 /**
  * Adaptador de Fabric.js para encapsular su API de bajo nivel.
@@ -218,6 +240,15 @@ export class FabricAdapter {
   }
 
   /**
+   * Determina si se omiten las interacciones con objetos (para modo desplazamiento)
+   * @param {boolean} skip
+   */
+  setSkipTargetFind(skip) {
+    if (!this.canvas) return
+    this.canvas.skipTargetFind = skip
+  }
+
+  /**
    * Determina el cursor predeterminado del lienzo
    * @param {string} cursor
    */
@@ -270,6 +301,10 @@ export class FabricAdapter {
         hoverCursor: 'default',
         originX: 'left',
         originY: 'top',
+        left: 0,
+        top: 0,
+        scaleX: 1,
+        scaleY: 1,
         isMapBase: true,
       })
       this.canvas.insertAt(0, img)

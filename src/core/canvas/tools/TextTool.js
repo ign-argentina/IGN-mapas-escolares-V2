@@ -13,10 +13,19 @@ export class TextTool extends BaseTool {
     this.previewShape = null
   }
 
-  onActivate() {
-    this.canvasManager.adapter.setDrawingMode(false)
-    this.canvasManager.adapter.setSelectionEnabled(false)
-    this.canvasManager.adapter.setDefaultCursor('crosshair')
+  onActivate() {}
+
+  onDeactivate() {
+    this.cleanup()
+  }
+
+  cleanup() {
+    if (this.previewShape) {
+      this.canvasManager.adapter.removeObject(this.previewShape)
+      this.previewShape = null
+      this.canvasManager.adapter.requestRenderAll()
+    }
+    this.isDrawing = false
   }
 
   onMouseDown(opt) {
@@ -50,7 +59,7 @@ export class TextTool extends BaseTool {
 
     const left = Math.min(this.startX, currentX)
     const top = Math.min(this.startY, currentY)
-    const width = Math.max(Math.abs(currentX - this.startX), 120)
+    const width = Math.max(Math.abs(currentX - this.startX), 350)
 
     this.previewShape.set({ left, top, width })
     this.canvasManager.adapter.requestRenderAll()
@@ -67,7 +76,7 @@ export class TextTool extends BaseTool {
       this.previewShape.set({
         left: this.startX,
         top: this.startY,
-        width: 180,
+        width: 450,
         originX: 'center',
         originY: 'center',
         textAlign: 'center',

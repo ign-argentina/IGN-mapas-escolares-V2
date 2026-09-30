@@ -4,6 +4,7 @@
   right: 295px;
   width: 260px;
   height: calc(100vh - 240px);
+  height: calc(100dvh - 240px);
   max-height: 380px;
   background-color: var(--nbi-color-panel-bg);
   display: flex;
@@ -33,10 +34,37 @@
 .nbi-stickers__content {
   flex: 1;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nbi-space-md);
+  padding: 8px 12px 12px 8px;
+  margin: -8px -12px -12px -8px;
+}
+
+.nbi-stickers__category {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nbi-space-sm);
+  margin-top: var(--nbi-space-sm);
+}
+
+.nbi-stickers__category:first-of-type {
+  margin-top: 0;
+}
+
+.nbi-stickers__category-title {
+  font-size: var(--nbi-font-size-sm);
+  font-weight: var(--nbi-font-weight-bold);
+  color: var(--nbi-color-black);
+  margin: 0;
+  padding-bottom: var(--nbi-space-xs);
+  border-bottom: var(--nbi-border-width-sm) solid var(--nbi-color-black);
+}
+
+.nbi-stickers__category-items {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--nbi-space-sm);
-  padding-right: var(--nbi-space-xs);
 }
 
 /* Custom scrollbar for stickers */
@@ -97,4 +125,17 @@
 
 .nbi-stickers__item:hover .nbi-stickers__img {
   filter: grayscale(1) brightness(0.1);
+}
+
+/* --- VISTA RESPONSIVA (CELULARES / PANTALLAS PEQUEÑAS) --- */
+@media (max-width: 768px) {
+  .nbi-stickers {
+    top: 64px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-width: calc(100vw - 24px);
+    height: auto;
+    max-height: calc(100dvh - 150px);
+  }
 }

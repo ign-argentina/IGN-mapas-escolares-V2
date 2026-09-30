@@ -19,19 +19,56 @@
   gap: 10px;
 }
 
+#logo-link {
+  display: flex;
+  align-items: center;
+}
+
 .nbi-navbar__logo {
-  height: 30px;
+  height: 33px;
   width: auto;
+  color: var(--nbi-color-white);
+  fill: currentColor;
+  display: block;
+}
+
+.nbi-navbar__logo path {
+  fill: currentColor;
 }
 
 .nbi-navbar__title {
-  font-size: var(--nbi-font-size-xl);
+  font-size: var(--nbi-font-size-xxl);
   font-weight: var(--nbi-font-weight-bold);
   letter-spacing: -0.5px;
+  color: var(--nbi-color-white);
 }
 
 .nbi-navbar__subtitle {
   font-size: 0.85rem;
   font-weight: var(--nbi-font-weight-semibold);
   opacity: 0.7;
+}
+
+/* --- VISTA RESPONSIVA (CELULARES / PANTALLAS PEQUEÑAS) --- */
+@media (max-width: 768px) {
+  .nbi-navbar {
+    top: 10px;
+    left: 10px;
+    min-width: 0;
+    max-width: calc(100vw - 20px);
+    height: 44px;
+    padding: 6px 12px;
+    gap: var(--nbi-space-sm);
+  }
+
+  .nbi-navbar__logo {
+    height: 24px;
+  }
+
+  .nbi-navbar__title {
+    font-size: var(--nbi-font-size-md);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }

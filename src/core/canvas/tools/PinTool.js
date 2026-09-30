@@ -13,10 +13,19 @@ export class PinTool extends BaseTool {
     this.previewShape = null
   }
 
-  onActivate() {
-    this.canvasManager.adapter.setDrawingMode(false)
-    this.canvasManager.adapter.setSelectionEnabled(false)
-    this.canvasManager.adapter.setDefaultCursor('crosshair')
+  onActivate() {}
+
+  onDeactivate() {
+    this.cleanup()
+  }
+
+  cleanup() {
+    if (this.previewShape) {
+      this.canvasManager.adapter.removeObject(this.previewShape)
+      this.previewShape = null
+      this.canvasManager.adapter.requestRenderAll()
+    }
+    this.isDrawing = false
   }
 
   onMouseDown(opt) {
@@ -46,9 +55,12 @@ export class PinTool extends BaseTool {
     const deltaX = pointer.x - this.startX
     const deltaY = pointer.y - this.startY
     const dist = Math.hypot(deltaX, deltaY)
-    const scale = Math.max(0.2, Math.min(3, dist / 50))
+    const scale = Math.max(0.6, Math.min(10, dist / 25))
 
     this.previewShape.set({ left: this.startX, top: this.startY, scaleX: scale, scaleY: scale })
+    if (typeof this.previewShape.setCoords === 'function') {
+      this.previewShape.setCoords()
+    }
     this.canvasManager.adapter.requestRenderAll()
   }
 
@@ -63,8 +75,8 @@ export class PinTool extends BaseTool {
       this.previewShape.set({
         left: this.startX,
         top: this.startY,
-        scaleX: 1,
-        scaleY: 1,
+        scaleX: 3,
+        scaleY: 3,
         originX: 'center',
         originY: 'bottom',
       })
@@ -75,6 +87,10 @@ export class PinTool extends BaseTool {
         originX: 'center',
         originY: 'bottom',
       })
+    }
+
+    if (typeof this.previewShape.setCoords === 'function') {
+      this.previewShape.setCoords()
     }
 
     this.canvasManager.finishCreatedObject(this.previewShape, 'pin')

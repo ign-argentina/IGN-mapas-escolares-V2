@@ -6,18 +6,21 @@
   width: 320px;
   display: flex;
   flex-direction: column;
+  min-height: 0;
   background-color: var(--nbi-color-panel-bg);
   transition: transform var(--nbi-transition-slow), opacity var(--nbi-transition-slow);
 }
 
 .nbi-sidebar.is-collapsed {
-  transform: translateX(-340px);
+  transform: translateX(-320px);
 }
 
 .nbi-sidebar__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-width: 0;
+  padding-right: 6px;
   margin-bottom: var(--nbi-space-lg);
   padding-bottom: var(--nbi-space-md);
   border-bottom: var(--nbi-border-width-md) solid var(--nbi-color-black);
@@ -32,12 +35,21 @@
 .nbi-sidebar__scroll {
   flex: 1;
   overflow-y: auto;
-  padding-right: var(--nbi-space-xs);
+  padding: 16px 20px 24px 16px;
   display: grid;
-  grid-template-columns: repeat(2, 100px);
+  grid-template-columns: repeat(2, 110px);
   gap: var(--nbi-space-lg);
   justify-content: center;
   align-content: start;
+  overflow-x: hidden;
+}
+
+.nbi-sidebar__scroll--panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nbi-space-md);
+  grid-template-columns: 1fr;
+  width: 100%;
 }
 
 /* Custom scrollbar para estética brutalista */
@@ -64,6 +76,13 @@
   left: 20px;
   z-index: var(--nbi-z-sidebar-btn);
   background-color: var(--nbi-color-secondary);
+  font-family: inherit;
+}
+
+.nbi-sidebar__toggle-btn span.btn-text {
+  font-weight: var(--nbi-font-weight-semibold);
+  font-size: var(--nbi-font-size-md);
+  margin-left: 5px;
 }
 
 /* TARJETAS DE PROVINCIAS (CUADRADAS 110x110px) */
@@ -103,12 +122,17 @@
   width: 100%;
   height: auto;
   flex: 1;
-  min-height: 50px;
+  min-height: 40px;
   object-fit: cover;
   border-bottom: var(--nbi-border-width-md) solid var(--nbi-color-black);
   background-color: var(--nbi-color-bg-main);
   flex-shrink: 1;
   filter: contrast(0.9);
+  transition: min-height var(--nbi-transition-fast);
+}
+
+.nbi-map-card:hover .nbi-map-card__image {
+  min-height: 45px;
 }
 
 .nbi-map-card__info {
@@ -124,8 +148,12 @@
   word-break: normal;
   overflow-wrap: anywhere;
   background-color: var(--nbi-color-white);
-  transition: background-color var(--nbi-transition-fast);
+  transition: background-color var(--nbi-transition-fast), font-size var(--nbi-transition-fast);
   flex-shrink: 0;
+}
+
+.nbi-map-card:hover .nbi-map-card__info {
+  font-size: var(--nbi-font-size-base);
 }
 
 .nbi-map-card.is-active .nbi-map-card__info {
@@ -137,6 +165,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--nbi-space-md);
+  flex-shrink: 0;
   padding-bottom: var(--nbi-space-lg);
   border-bottom: var(--nbi-border-width-md) solid var(--nbi-color-black);
   margin-bottom: var(--nbi-space-lg);
@@ -215,4 +244,131 @@
   color: var(--nbi-color-muted);
   padding: var(--nbi-space-xxl) 0;
   font-size: var(--nbi-font-size-base);
+}
+
+/* --- SOLAPAS DE LA BARRA LATERAL --- */
+.nbi-sidebar__tabs {
+  position: absolute;
+  top: 16px;
+  left: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--nbi-space-sm);
+  z-index: var(--nbi-z-sidebar-btn);
+}
+
+.nbi-sidebar__tab {
+  background-color: var(--nbi-color-primary);
+  border: var(--nbi-border-width-md) solid var(--nbi-color-black);
+  border-left: none;
+  border-radius: 0 var(--nbi-radius-button) var(--nbi-radius-button) 0;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  cursor: pointer;
+  box-shadow: 2px 2px 0px 0px var(--nbi-color-black);
+  padding: 0 12px;
+  transition: width var(--nbi-transition-fast), transform var(--nbi-transition-fast),
+    background-color var(--nbi-transition-fast), box-shadow var(--nbi-transition-fast);
+  transform: translateX(2px);
+  font-family: var(--nbi-font-family);
+}
+
+.nbi-sidebar__tab:hover,
+.nbi-sidebar__tab:focus-visible {
+  background-color: var(--nbi-color-secondary);
+  width: 152px;
+  transform: translateX(4px);
+  font-family: var(--nbi-font-family);
+  font-size: var(--nbi-font-size-md);
+}
+
+.nbi-sidebar__tab:focus-visible {
+  outline: var(--nbi-border-width-md) solid var(--color-border) !important;
+  outline-offset: 2px !important;
+}
+
+.nbi-sidebar__tab.is-active {
+  background-color: var(--nbi-color-accent);
+  transform: translateX(2px);
+  box-shadow: 1px 1px 0px 0px var(--nbi-color-black);
+}
+
+.nbi-sidebar__tab svg {
+  width: 20px;
+  height: 20px;
+  stroke: var(--nbi-color-black);
+  stroke-width: 2.5px;
+}
+
+.nbi-sidebar__tab img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
+.nbi-sidebar__tab > svg,
+.nbi-sidebar__tab > img {
+  flex: 0 0 auto;
+}
+
+.nbi-sidebar__tab-label {
+  max-width: 0;
+  margin-left: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  font-size: var(--nbi-font-size-sm);
+  font-weight: var(--nbi-font-weight-bold);
+  transition: max-width var(--nbi-transition-fast), margin-left var(--nbi-transition-fast),
+    opacity var(--nbi-transition-fast);
+}
+
+.nbi-sidebar__tab:hover .nbi-sidebar__tab-label,
+.nbi-sidebar__tab:focus-visible .nbi-sidebar__tab-label {
+  max-width: 120px;
+  margin-left: var(--nbi-space-sm);
+  opacity: 1;
+}
+
+/* --- CONTENEDORES DE VISTAS --- */
+.nbi-sidebar__window {
+  flex: 1;
+  width: auto !important;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.nbi-sidebar__view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.nbi-sidebar__view.hidden {
+  display: none !important;
+}
+
+/* --- VISTA RESPONSIVA (CELULARES / PANTALLAS PEQUEÑAS) --- */
+@media (max-width: 768px) {
+  .nbi-sidebar {
+    left: -5px;
+    top: 64px;
+    bottom: max(16px, env(safe-area-inset-bottom, 16px));
+    max-width: calc(100vw - 48px);
+  }
+
+  .nbi-sidebar.is-collapsed {
+    transform: translateX(-100%);
+  }
 }

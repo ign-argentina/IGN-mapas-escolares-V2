@@ -1,33 +1,77 @@
 import { Component } from '../Component.js'
+import { ClearConfirmModal } from '../clear-confirm-modal/ClearConfirmModal.js'
 
 /**
  * Componente que gestiona la barra de herramientas de dibujo y acciones globales del lienzo.
  */
 export class Toolbar extends Component {
-  constructor(container, props) {
+  constructor(container, props = {}) {
     super(container, props)
     this.canvasManager = props.canvasManager
+    this.sidebar = props.sidebar || null
+    this.onCanvasToolActivated = props.onCanvasToolActivated || null
     this.toolButtons = {}
   }
 
   render() {
     this.toolButtons = {
+      pan: document.getElementById('tool-pan'),
       select: document.getElementById('tool-select'),
       brush: document.getElementById('tool-brush'),
       rect: document.getElementById('tool-rect'),
       circle: document.getElementById('tool-circle'),
       arrow: document.getElementById('tool-arrow'),
+      polyline: document.getElementById('tool-polyline'),
+      polygon: document.getElementById('tool-polygon'),
       text: document.getElementById('tool-text'),
       pin: document.getElementById('tool-pin'),
     }
 
     this.deleteBtn = document.getElementById('tool-delete')
     this.clearBtn = document.getElementById('tool-clear')
+    this.undoBtn = document.getElementById('action-undo')
+    this.redoBtn = document.getElementById('action-redo')
     this.zoomInBtn = document.getElementById('action-zoom-in')
     this.zoomOutBtn = document.getElementById('action-zoom-out')
     this.zoomHomeBtn = document.getElementById('action-zoom-home')
+    this.moreBtn = document.getElementById('tool-more')
+    this.overflowMenu = document.getElementById('toolbar-overflow-menu')
+    this.overflowTools = ['rect', 'circle', 'arrow', 'polyline', 'polygon', 'pin']
+
+    const modalEl = document.getElementById('clear-confirm-modal')
+    if (modalEl) {
+      this.clearConfirmModal = new ClearConfirmModal(modalEl, () => {
+        this.canvasManager.clearCanvas()
+      })
+    }
+
+    // Controles contextuales de finalización para trazado de polígonos / polilíneas
+    this.geometryActionsEl = document.getElementById('geometry-actions')
+    this.geometryPointsCountEl = document.getElementById('geometry-points-count')
+    this.geometryUndoBtn = document.getElementById('geometry-btn-undo')
+    this.geometryFinishBtn = document.getElementById('geometry-btn-finish')
+    this.geometryCancelBtn = document.getElementById('geometry-btn-cancel')
+
+    if (window.lucide) {
+      window.lucide.createIcons()
+    }
 
     this.updateActiveToolUI(this.canvasManager.activeTool)
+  }
+
+  activateTool(toolName) {
+    if (this.sidebar && this.sidebar.isOpen && typeof this.sidebar.close === 'function') {
+      this.sidebar.close()
+    }
+    this.closeOverflowMenu()
+    if (toolName !== 'polyline' && toolName !== 'polygon') {
+      this.hideGeometryActions()
+    }
+    if (typeof this.onCanvasToolActivated === 'function') {
+      this.onCanvasToolActivated(toolName)
+    }
+    this.canvasManager.setTool(toolName)
+    this.updateActiveToolUI(toolName)
   }
 
   bindEvents() {
@@ -35,21 +79,71 @@ export class Toolbar extends Component {
     Object.entries(this.toolButtons).forEach(([toolName, btn]) => {
       if (btn) {
         this.addEvent(btn, 'click', () => {
-          this.canvasManager.setTool(toolName)
-          this.updateActiveToolUI(toolName)
+          this.activateTool(toolName)
         })
       }
     })
 
+    // Manejar menú de 3 puntos (overflow)
+    if (this.moreBtn && this.overflowMenu) {
+      this.addEvent(this.moreBtn, 'click', (e) => {
+        e.stopPropagation()
+        this.toggleOverflowMenu()
+      })
+
+      this.addEvent(document, 'click', (e) => {
+        if (
+          this.isOverflowOpen() &&
+          !this.overflowMenu.contains(e.target) &&
+          !this.moreBtn.contains(e.target)
+        ) {
+          this.closeOverflowMenu()
+        }
+      })
+
+      this.addEvent(window, 'keydown', (e) => {
+        if (e.key === 'Escape' && this.isOverflowOpen()) {
+          this.closeOverflowMenu()
+          this.moreBtn.focus()
+        }
+      })
+    }
+
+    const stickersBtn = document.getElementById('tool-stickers')
+    if (stickersBtn) {
+      this.addEvent(stickersBtn, 'click', () => {
+        this.closeOverflowMenu()
+      })
+    }
+
     if (this.deleteBtn) {
       this.addEvent(this.deleteBtn, 'click', () => {
         this.canvasManager.deleteSelected()
+        if (this.canvasManager?.activeTool !== 'select') {
+          this.activateTool('select')
+        }
       })
     }
 
     if (this.clearBtn) {
       this.addEvent(this.clearBtn, 'click', () => {
-        this.canvasManager.clearCanvas()
+        if (this.clearConfirmModal) {
+          this.clearConfirmModal.open()
+        } else {
+          this.canvasManager.clearCanvas()
+        }
+      })
+    }
+
+    if (this.undoBtn) {
+      this.addEvent(this.undoBtn, 'click', () => {
+        this.canvasManager.undo()
+      })
+    }
+
+    if (this.redoBtn) {
+      this.addEvent(this.redoBtn, 'click', () => {
+        this.canvasManager.redo()
       })
     }
 
@@ -71,9 +165,132 @@ export class Toolbar extends Component {
       })
     }
 
+    // Botones de acción para finalización / cancelación de trazado de polígonos y polilíneas
+    if (this.geometryUndoBtn) {
+      this.addEvent(this.geometryUndoBtn, 'click', (e) => {
+        e.preventDefault()
+        const activeTool = this.canvasManager?.toolService?.activeTool
+        if (activeTool && typeof activeTool.undoLastPoint === 'function') {
+          activeTool.undoLastPoint()
+        }
+      })
+    }
+
+    if (this.geometryFinishBtn) {
+      this.addEvent(this.geometryFinishBtn, 'click', (e) => {
+        e.preventDefault()
+        const activeTool = this.canvasManager?.toolService?.activeTool
+        if (activeTool && typeof activeTool.finishDrawing === 'function') {
+          activeTool.finishDrawing()
+        }
+      })
+    }
+
+    if (this.geometryCancelBtn) {
+      this.addEvent(this.geometryCancelBtn, 'click', (e) => {
+        e.preventDefault()
+        const activeTool = this.canvasManager?.toolService?.activeTool
+        if (activeTool && typeof activeTool.cancelDrawing === 'function') {
+          activeTool.cancelDrawing()
+        }
+      })
+    }
+
+    // Escuchar eventos de progreso geométrico disparados por PolygonTool / PolylineTool
+    if (this.canvasManager?.adapter) {
+      this.unsubscribeGeometry = this.canvasManager.adapter.on('geometry:progress', (data) => {
+        this.updateGeometryActionsUI(data)
+      })
+    }
+
     // Escuchar eventos de cambio de herramientas disparados internamente en CanvasManager
     this.canvasManager.onToolChange = (activeTool) => {
       this.updateActiveToolUI(activeTool)
+      if (activeTool !== 'polyline' && activeTool !== 'polygon') {
+        this.hideGeometryActions()
+      }
+    }
+  }
+
+  unbindEvents() {
+    super.unbindEvents()
+    if (typeof this.unsubscribeGeometry === 'function') {
+      this.unsubscribeGeometry()
+      this.unsubscribeGeometry = null
+    }
+  }
+
+  updateGeometryActionsUI(data = {}) {
+    if (!this.geometryActionsEl) return
+    const { tool, pointsCount = 0, canFinish = false } = data
+
+    if (!pointsCount || pointsCount === 0 || (tool !== 'polyline' && tool !== 'polygon')) {
+      this.hideGeometryActions()
+      return
+    }
+
+    this.geometryActionsEl.classList.remove('hidden')
+
+    if (this.geometryPointsCountEl) {
+      this.geometryPointsCountEl.textContent = `${pointsCount} ${pointsCount === 1 ? 'punto' : 'puntos'}`
+    }
+
+    if (this.geometryFinishBtn) {
+      this.geometryFinishBtn.disabled = !canFinish
+    }
+
+    if (this.geometryUndoBtn) {
+      this.geometryUndoBtn.disabled = pointsCount <= 0
+    }
+  }
+
+  hideGeometryActions() {
+    if (this.geometryActionsEl) {
+      this.geometryActionsEl.classList.add('hidden')
+    }
+    if (this.geometryPointsCountEl) {
+      this.geometryPointsCountEl.textContent = '0 puntos'
+    }
+    if (this.geometryFinishBtn) {
+      this.geometryFinishBtn.disabled = true
+    }
+    if (this.geometryUndoBtn) {
+      this.geometryUndoBtn.disabled = true
+    }
+  }
+
+  isOverflowOpen() {
+    return !!this.overflowMenu?.classList.contains('is-open')
+  }
+
+  openOverflowMenu() {
+    if (this.overflowMenu) {
+      this.overflowMenu.classList.remove('hidden')
+      this.overflowMenu.classList.add('is-open')
+    }
+    if (this.moreBtn) {
+      this.moreBtn.setAttribute('aria-expanded', 'true')
+      this.moreBtn.classList.add('is-active')
+    }
+  }
+
+  closeOverflowMenu() {
+    if (this.overflowMenu) {
+      this.overflowMenu.classList.remove('is-open')
+    }
+    if (this.moreBtn) {
+      this.moreBtn.setAttribute('aria-expanded', 'false')
+      if (!this.overflowTools?.includes(this.canvasManager?.activeTool)) {
+        this.moreBtn.classList.remove('is-active')
+      }
+    }
+  }
+
+  toggleOverflowMenu() {
+    if (this.isOverflowOpen()) {
+      this.closeOverflowMenu()
+    } else {
+      this.openOverflowMenu()
     }
   }
 
@@ -83,6 +300,17 @@ export class Toolbar extends Component {
     })
     if (this.toolButtons[activeTool]) {
       this.toolButtons[activeTool].classList.add('is-active')
+    }
+    if (this.moreBtn) {
+      const isOverflowActive = this.overflowTools?.includes(activeTool)
+      if (isOverflowActive) {
+        this.moreBtn.classList.add('is-tool-active')
+      } else {
+        this.moreBtn.classList.remove('is-tool-active')
+        if (!this.isOverflowOpen()) {
+          this.moreBtn.classList.remove('is-active')
+        }
+      }
     }
   }
 }
